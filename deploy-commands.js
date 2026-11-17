@@ -22,7 +22,7 @@ const rest = new REST().setToken(config.token);
 
         // Déploiement GLOBAL (puisque ton bot est vérifié)
         const data = await rest.put(
-            Routes.applicationCommands(config.clientId),
+            config.guildId ? Routes.applicationGuildCommands(config.clientId, config.guildId) : Routes.applicationCommands(config.clientId),
             { body: commands }
         );
 
