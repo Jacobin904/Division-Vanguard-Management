@@ -14,14 +14,11 @@ const client = new Client({
         GatewayIntentBits.GuildPresences
     ],
     partials: [Partials.Channel, Partials.GuildMember, Partials.User],
-    // Parametres de reconnexion agressifs
     ws: {
         large_threshold: 250,
         version: 10
     },
-    // Timeout plus long avant de considerer une deconnexion
     closeTimeout: 15000,
-    // Retry automatiquement en cas d'echec de connexion
     retryLimit: Infinity
 });
 
@@ -36,7 +33,7 @@ for (const file of commandFiles) {
         const command = require(path.join(commandsPath, file));
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
-            console.log(`[CMD] Commande chargee : ${command.data.name}`);
+            console.log(`[CMD] Commande chargée : ${command.data.name}`);
         } else {
             console.warn(`[CMD] La commande ${file} manque data ou execute`);
         }
@@ -45,9 +42,11 @@ for (const file of commandFiles) {
     }
 }
 
-// Chargement des evenements
+// Chargement des événements (EXCLUSION de clientStatus.js qui est géré séparément)
 const eventsPath = path.join(__dirname, 'events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js') && file !== 'clientStatus.js');
+const eventFiles = fs.readdirSync(eventsPath).filter(file =>
+    file.endsWith('.js') && file !== 'clientStatus.js'
+);
 
 for (const file of eventFiles) {
     try {
@@ -57,13 +56,13 @@ for (const file of eventFiles) {
         } else {
             client.on(event.name, (...args) => event.execute(...args, client));
         }
-        console.log(`[EVENT] Evenement charge : ${event.name}`);
+        console.log(`[EVENT] Événement chargé : ${event.name}`);
     } catch (error) {
         console.error(`[EVENT] Erreur chargement ${file} :`, error);
     }
 }
 
-// Enregistrement des gestionnaires de statut WebSocket
+// Enregistrement des gestionnaires de statut WebSocket (manuel)
 clientStatus.registerAll(client);
 
 // Gestionnaire de connexion/reconnexion automatique
@@ -78,7 +77,7 @@ client.on(Events.ShardDisconnect, () => {
 
 client.on(Events.ShardReady, () => {
     reconnectAttempts = 0;
-    console.log('[RECONNECT] Compteur de tentatives reinitialise.');
+    console.log('[RECONNECT] Compteur de tentatives réinitialisé.');
 });
 
 // Login avec retry automatique
@@ -94,7 +93,6 @@ async function loginWithRetry() {
 
 loginWithRetry();
 
-// Message final de securite
 process.on('exit', (code) => {
-    console.log(`[PROCESS] Processus termine avec le code ${code}.`);
+    console.log(`[PROCESS] Processus terminé avec le code ${code}.`);
 });
