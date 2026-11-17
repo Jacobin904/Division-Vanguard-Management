@@ -1,0 +1,15 @@
+{
+  "name": "discord-server-info-bot",
+  "version": "1.0.0",
+  "description": "Bot qui récupère toutes les infos d'un serveur Discord",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5"
+  }
+}
