@@ -22,14 +22,14 @@ module.exports = {
             sub.setName('kick')
                 .setDescription('Exclure un membre du serveur')
                 .addUserOption(o => o.setName('membre').setDescription('Membre à exclure').setRequired(true))
-                .addStringOption(o => o.setName('raison').setDescription('Raison de l\'exclusion').setRequired(true)))
+                .addStringOption(o => o.setName('raison').setDescription("Raison de l'exclusion").setRequired(true)))
         .setDefaultMemberPermissions(0),
 
     async execute(interaction) {
         // Vérification des permissions
         if (!canSanction(interaction.member)) {
             return interaction.reply({
-                content: '[ERREUR] Vous n\'avez pas les permissions nécessaires pour infliger une sanction. Seuls les sous-officiers (Sergent et grades supérieurs) peuvent utiliser cette commande.',
+                content: "[ERREUR] Vous n'avez pas les permissions nécessaires pour infliger une sanction. Seuls les sous-officiers (Sergent et grades supérieurs) peuvent utiliser cette commande.",
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -42,7 +42,7 @@ module.exports = {
         // Vérification que le membre n'est pas un admin
         if (membre.roles.cache.some(r => config.adminRoles.includes(r.id))) {
             return interaction.reply({
-                content: '[ERREUR] Impossible de sanctionner un membre de l\'administration.',
+                content: "[ERREUR] Impossible de sanctionner un membre de l'administration.",
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -50,7 +50,7 @@ module.exports = {
         // Vérification hiérarchie
         if (membre.roles.highest.position >= interaction.member.roles.highest.position && !interaction.member.roles.cache.some(r => config.adminRoles.includes(r.id))) {
             return interaction.reply({
-                content: '[ERREUR] Vous ne pouvez pas sanctionner un membre ayant un grade égal ou supérieur au vôtre.',
+                content: "[ERREUR] Vous ne pouvez pas sanctionner un membre ayant un grade égal ou supérieur au vôtre.",
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -72,7 +72,7 @@ module.exports = {
                 const duree = interaction.options.getInteger('duree');
                 try {
                     await membre.timeout(duree * 60 * 1000, raison);
-                    action = `MUTE TEMPORAIRE`;
+                    action = 'MUTE TEMPORAIRE';
                     actionColor = 0xff6f00;
                     actionEmoji = '🔇';
                     detailsAction = `Le membre a été rendu muet pour une durée de ${duree} minute(s).`;
@@ -109,7 +109,7 @@ module.exports = {
         // Embed pour sanctions-discipl (public - TRÈS RICHE)
         const embedPublic = new EmbedBuilder()
             .setAuthor({
-                name: `Division Vanguard - Registre Disciplinaire`,
+                name: "Division Vanguard - Registre Disciplinaire",
                 iconURL: interaction.guild.iconURL({ size: 64 }) || undefined
             })
             .setTitle(`${actionEmoji} [SANCTION] ${action}`)
@@ -131,7 +131,7 @@ module.exports = {
                 { name: 'Description', value: detailsAction, inline: false }
             )
             .setFooter({
-                text: `Division Vanguard - Registre disciplinaire officiel`,
+                text: "Division Vanguard - Registre disciplinaire officiel",
                 iconURL: interaction.user.displayAvatarURL()
             });
 
@@ -140,10 +140,10 @@ module.exports = {
         // Embed pour sanctions-internes (admin only - encore plus détaillé)
         const embedInterne = new EmbedBuilder()
             .setAuthor({
-                name: `Administration Interne - Log Confidentiel`,
+                name: "Administration Interne - Log Confidentiel",
                 iconURL: interaction.guild.iconURL({ size: 64 }) || undefined
             })
-            .setTitle(`[LOG INTERNE] Sanction enregistrée`)
+            .setTitle('[LOG INTERNE] Sanction enregistrée')
             .setColor(actionColor)
             .setTimestamp(date)
             .addFields(
@@ -151,7 +151,7 @@ module.exports = {
                 { name: 'Membre sanctionné', value: `${membre.user.username}\nID: \`${membre.id}\``, inline: true },
                 { name: 'Autorité', value: `${interaction.user.username}\nID: \`${interaction.user.id}\``, inline: true },
                 { name: 'Grade du sanctionné', value: getHighestGrade(membre), inline: true },
-                { name: 'Grade de l'autorité', value: getHighestGrade(interaction.member), inline: true },
+                { name: "Grade de l'autorité", value: getHighestGrade(interaction.member), inline: true },
                 { name: 'Date', value: `<t:${Math.floor(date.getTime() / 1000)}:F>`, inline: true },
                 { name: 'Raison', value: raison.length > 1024 ? raison.substring(0, 1020) + '...' : raison, inline: false }
             )
@@ -162,14 +162,14 @@ module.exports = {
         // Log général
         await logAction(interaction.client, {
             title: 'SANCTION ENREGISTRÉE',
-            description: `Une sanction disciplinaire a été appliquée et consignée dans les registres officiels.`,
+            description: "Une sanction disciplinaire a été appliquée et consignée dans les registres officiels.",
             color: actionColor,
             fields: [
                 { name: 'Type', value: `\`${action}\``, inline: true },
                 { name: 'Membre', value: `${membre.user.username}\nID: \`${membre.id}\``, inline: true },
                 { name: 'Autorité', value: `${interaction.user.username}\nID: \`${interaction.user.id}\``, inline: true },
                 { name: 'Grade sanctionné', value: getHighestGrade(membre), inline: true },
-                { name: 'Grade autorité', value: getHighestGrade(interaction.member), inline: true },
+                { name: "Grade de l'autorité", value: getHighestGrade(interaction.member), inline: true },
                 { name: 'Date', value: `<t:${Math.floor(date.getTime() / 1000)}:R>`, inline: true },
                 { name: 'Raison', value: raison.length > 1024 ? raison.substring(0, 1020) + '...' : raison, inline: false }
             ]
