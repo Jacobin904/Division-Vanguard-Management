@@ -1,6 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../config/guildConfig');
-const { canSanction } = require('../utils/permissions');
+const { canSanction, getHighestGrade } = require('../utils/permissions');
 const { logAction, sendToChannel } = require('../utils/logger');
 
 module.exports = {
@@ -10,140 +10,185 @@ module.exports = {
         .addSubcommand(sub =>
             sub.setName('avertissement')
                 .setDescription('Donner un avertissement officiel')
-                .addUserOption(o => o.setName('membre').setDescription('Membre sanctionne').setRequired(true))
+                .addUserOption(o => o.setName('membre').setDescription('Membre sanctionné').setRequired(true))
                 .addStringOption(o => o.setName('raison').setDescription('Raison de la sanction').setRequired(true)))
         .addSubcommand(sub =>
             sub.setName('mute')
                 .setDescription('Rendre muet un membre temporairement')
-                .addUserOption(o => o.setName('membre').setDescription('Membre a mute').setRequired(true))
-                .addIntegerOption(o => o.setName('duree').setDescription('Duree en minutes').setRequired(true))
+                .addUserOption(o => o.setName('membre').setDescription('Membre à mute').setRequired(true))
+                .addIntegerOption(o => o.setName('duree').setDescription('Durée en minutes').setRequired(true))
                 .addStringOption(o => o.setName('raison').setDescription('Raison du mute').setRequired(true)))
         .addSubcommand(sub =>
             sub.setName('kick')
                 .setDescription('Exclure un membre du serveur')
-                .addUserOption(o => o.setName('membre').setDescription('Membre a exclure').setRequired(true))
-                .addStringOption(o => o.setName('raison').setDescription('Raison de l\'exclusion').setRequired(true))),
+                .addUserOption(o => o.setName('membre').setDescription('Membre à exclure').setRequired(true))
+                .addStringOption(o => o.setName('raison').setDescription('Raison de l\'exclusion').setRequired(true)))
+        .setDefaultMemberPermissions(0),
 
     async execute(interaction) {
-        // Verification des permissions
+        // Vérification des permissions
         if (!canSanction(interaction.member)) {
             return interaction.reply({
-                content: '[ERREUR] Vous n\'avez pas les permissions necessaires pour infliger une sanction.',
-                ephemeral: true
+                content: '[ERREUR] Vous n\'avez pas les permissions nécessaires pour infliger une sanction. Seuls les sous-officiers (Sergent et grades supérieurs) peuvent utiliser cette commande.',
+                flags: MessageFlags.Ephemeral
             });
         }
 
         const sub = interaction.options.getSubcommand();
         const membre = interaction.options.getMember('membre');
         const raison = interaction.options.getString('raison');
-        const date = new Date().toUTCString();
+        const date = new Date();
 
-        // Verification que le membre n'est pas un admin
+        // Vérification que le membre n'est pas un admin
         if (membre.roles.cache.some(r => config.adminRoles.includes(r.id))) {
             return interaction.reply({
                 content: '[ERREUR] Impossible de sanctionner un membre de l\'administration.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
-        // Verification hierarchie (on ne peut pas sanctionner quelqu'un de plus haut place)
+        // Vérification hiérarchie
         if (membre.roles.highest.position >= interaction.member.roles.highest.position && !interaction.member.roles.cache.some(r => config.adminRoles.includes(r.id))) {
             return interaction.reply({
-                content: '[ERREUR] Vous ne pouvez pas sanctionner un membre ayant un grade egal ou superieur au votre.',
-                ephemeral: true
+                content: '[ERREUR] Vous ne pouvez pas sanctionner un membre ayant un grade égal ou supérieur au vôtre.',
+                flags: MessageFlags.Ephemeral
             });
         }
 
         let action = '';
         let actionColor = 0xffaa00;
+        let actionEmoji = '';
+        let detailsAction = '';
 
         switch (sub) {
             case 'avertissement':
-                action = 'AVERTISSEMENT';
-                actionColor = 0xffaa00;
+                action = 'AVERTISSEMENT OFFICIEL';
+                actionColor = 0xff8f00;
+                actionEmoji = '⚠️';
+                detailsAction = 'Un avertissement officiel a été consigné au dossier du membre.';
                 break;
 
             case 'mute':
                 const duree = interaction.options.getInteger('duree');
                 try {
                     await membre.timeout(duree * 60 * 1000, raison);
-                    action = `MUTE (${duree} minutes)`;
-                    actionColor = 0xff8800;
+                    action = `MUTE TEMPORAIRE`;
+                    actionColor = 0xff6f00;
+                    actionEmoji = '🔇';
+                    detailsAction = `Le membre a été rendu muet pour une durée de ${duree} minute(s).`;
                 } catch (error) {
                     return interaction.reply({
                         content: `[ERREUR] Impossible de mute ce membre : ${error.message}`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
                 break;
 
             case 'kick':
                 try {
-                    // DM au membre avant le kick
                     try {
                         await membre.send({
-                            content: `[NOTIFICATION] Vous avez ete exclu du serveur Division Vanguard.\nRaison : ${raison}\nAutorite : ${interaction.user.username}`
+                            content: `[NOTIFICATION] Vous avez été exclu du serveur Division Vanguard.\n\nRaison : ${raison}\nAutorité : ${interaction.user.username} (${getHighestGrade(interaction.member)})\nDate : ${date.toUTCString()}`
                         });
-                    } catch (e) { /* DM fermes */ }
-                    
+                    } catch (e) { /* DM fermés */ }
+
                     await membre.kick(raison);
-                    action = 'EXCLUSION';
-                    actionColor = 0xff0000;
+                    action = 'EXCLUSION DU SERVEUR';
+                    actionColor = 0xd50000;
+                    actionEmoji = '🚫';
+                    detailsAction = 'Le membre a été exclu du serveur Division Vanguard.';
                 } catch (error) {
                     return interaction.reply({
                         content: `[ERREUR] Impossible d'exclure ce membre : ${error.message}`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
                 break;
         }
 
-        // Reponse a l'auteur
-        await interaction.reply({
-            content: `[SUCCES] Sanction "${action}" appliquee avec succes a ${membre.user.username}.`,
-            ephemeral: true
-        });
-
-        // Embed pour sanctions-discipl (public)
+        // Embed pour sanctions-discipl (public - TRÈS RICHE)
         const embedPublic = new EmbedBuilder()
-            .setTitle(`[SANCTION] ${action}`)
+            .setAuthor({
+                name: `Division Vanguard - Registre Disciplinaire`,
+                iconURL: interaction.guild.iconURL({ size: 64 }) || undefined
+            })
+            .setTitle(`${actionEmoji} [SANCTION] ${action}`)
             .setColor(actionColor)
-            .setTimestamp()
+            .setTimestamp(date)
+            .setThumbnail(membre.user.displayAvatarURL({ size: 256 }))
             .addFields(
-                { name: 'Membre sanctionne', value: `${membre.user.username}\nID: ${membre.id}`, inline: true },
-                { name: 'Autorite', value: `${interaction.user.username}\nID: ${interaction.user.id}`, inline: true },
-                { name: 'Date', value: date, inline: true },
-                { name: 'Raison', value: raison, inline: false }
+                { name: '═══════ SANCTIONNÉ ═══════', value: '\u200b', inline: false },
+                { name: 'Membre', value: `${membre.user.username}\nID: \`${membre.id}\``, inline: true },
+                { name: 'Grade', value: getHighestGrade(membre), inline: true },
+                { name: 'Rôle le plus haut', value: membre.roles.highest?.name || 'Aucun', inline: true },
+                { name: '═══════ AUTORITÉ ═══════', value: '\u200b', inline: false },
+                { name: 'Sanctionneur', value: `${interaction.user.username}\nID: \`${interaction.user.id}\``, inline: true },
+                { name: 'Grade', value: getHighestGrade(interaction.member), inline: true },
+                { name: 'Date', value: `<t:${Math.floor(date.getTime() / 1000)}:F>`, inline: true },
+                { name: '═══════ MOTIF ═══════', value: '\u200b', inline: false },
+                { name: 'Raison officielle', value: raison.length > 1024 ? raison.substring(0, 1020) + '...' : raison, inline: false },
+                { name: '═══════ DÉTAILS ═══════', value: '\u200b', inline: false },
+                { name: 'Description', value: detailsAction, inline: false }
             )
-            .setFooter({ text: 'Division Vanguard - Registre disciplinaire' });
+            .setFooter({
+                text: `Division Vanguard - Registre disciplinaire officiel`,
+                iconURL: interaction.user.displayAvatarURL()
+            });
 
         await sendToChannel(interaction.client, config.channels.sanctionsDiscipl, { embed: embedPublic });
 
-        // Embed pour sanctions-internes (plus detaille, admin only)
+        // Embed pour sanctions-internes (admin only - encore plus détaillé)
         const embedInterne = new EmbedBuilder()
-            .setTitle(`[LOG INTERNE] Sanction enregistree`)
+            .setAuthor({
+                name: `Administration Interne - Log Confidentiel`,
+                iconURL: interaction.guild.iconURL({ size: 64 }) || undefined
+            })
+            .setTitle(`[LOG INTERNE] Sanction enregistrée`)
             .setColor(actionColor)
-            .setTimestamp()
+            .setTimestamp(date)
             .addFields(
-                { name: 'Type', value: action, inline: true },
-                { name: 'Membre', value: `${membre.user.username} (${membre.id})`, inline: true },
-                { name: 'Autorite', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
-                { name: 'Raison', value: raison, inline: false }
-            );
+                { name: 'Type de sanction', value: `\`${action}\``, inline: true },
+                { name: 'Membre sanctionné', value: `${membre.user.username}\nID: \`${membre.id}\``, inline: true },
+                { name: 'Autorité', value: `${interaction.user.username}\nID: \`${interaction.user.id}\``, inline: true },
+                { name: 'Grade du sanctionné', value: getHighestGrade(membre), inline: true },
+                { name: 'Grade de l'autorité', value: getHighestGrade(interaction.member), inline: true },
+                { name: 'Date', value: `<t:${Math.floor(date.getTime() / 1000)}:F>`, inline: true },
+                { name: 'Raison', value: raison.length > 1024 ? raison.substring(0, 1020) + '...' : raison, inline: false }
+            )
+            .setFooter({ text: 'Document confidentiel - Administration Interne' });
 
         await sendToChannel(interaction.client, config.channels.sanctionsInternes, { embed: embedInterne });
 
-        // Log general
+        // Log général
         await logAction(interaction.client, {
-            title: 'SANCTION ENREGISTREE',
-            description: `Une sanction a ete appliquee.`,
+            title: 'SANCTION ENREGISTRÉE',
+            description: `Une sanction disciplinaire a été appliquée et consignée dans les registres officiels.`,
             color: actionColor,
             fields: [
-                { name: 'Type', value: action, inline: true },
-                { name: 'Membre', value: `${membre.user.username} (${membre.id})`, inline: true },
-                { name: 'Autorite', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
-                { name: 'Raison', value: raison, inline: false }
+                { name: 'Type', value: `\`${action}\``, inline: true },
+                { name: 'Membre', value: `${membre.user.username}\nID: \`${membre.id}\``, inline: true },
+                { name: 'Autorité', value: `${interaction.user.username}\nID: \`${interaction.user.id}\``, inline: true },
+                { name: 'Grade sanctionné', value: getHighestGrade(membre), inline: true },
+                { name: 'Grade autorité', value: getHighestGrade(interaction.member), inline: true },
+                { name: 'Date', value: `<t:${Math.floor(date.getTime() / 1000)}:R>`, inline: true },
+                { name: 'Raison', value: raison.length > 1024 ? raison.substring(0, 1020) + '...' : raison, inline: false }
             ]
         });
+
+        // Réponse à l'auteur
+        const embedConfirmation = new EmbedBuilder()
+            .setTitle(`${actionEmoji} [SUCCÈS] Sanction appliquée`)
+            .setColor(actionColor)
+            .setTimestamp()
+            .setThumbnail(membre.user.displayAvatarURL({ size: 64 }))
+            .addFields(
+                { name: 'Type', value: `\`${action}\``, inline: true },
+                { name: 'Membre', value: `${membre.user.username}\nID: \`${membre.id}\``, inline: true },
+                { name: 'Date', value: `<t:${Math.floor(date.getTime() / 1000)}:R>`, inline: true },
+                { name: 'Archives', value: `La sanction a été enregistrée dans <#${config.channels.sanctionsDiscipl}> et <#${config.channels.sanctionsInternes}>.`, inline: false }
+            )
+            .setFooter({ text: 'Division Vanguard - Registre disciplinaire' });
+
+        await interaction.reply({ embeds: [embedConfirmation], flags: MessageFlags.Ephemeral });
     }
 };
