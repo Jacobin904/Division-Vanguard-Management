@@ -6,21 +6,21 @@ const { logAction, sendToChannel } = require('../utils/logger');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('sanction')
-        .setDescription('Infliger une sanction disciplinaire (officiers/sous-officiers)')
-        .addSubcommand(sub => 
+        .setDescription('Infliger une sanction disciplinaire (officiers et sous-officiers)')
+        .addSubcommand(sub =>
             sub.setName('avertissement')
                .setDescription('Donner un avertissement officiel')
                .addUserOption(o => o.setName('membre').setDescription('Le membre a sanctionner').setRequired(true))
                .addStringOption(o => o.setName('raison').setDescription('Raison de la sanction').setRequired(true))
         )
-        .addSubcommand(sub => 
+        .addSubcommand(sub =>
             sub.setName('mute')
                .setDescription('Rendre muet un membre temporairement')
-               .addUserOption(o => o.setName('membre').setDescription('Le membre a mute').setRequired(true))
+               .addUserOption(o => o.setName('membre').setDescription('Le membre a rendre muet').setRequired(true))
                .addIntegerOption(o => o.setName('duree').setDescription('Duree en minutes').setRequired(true))
                .addStringOption(o => o.setName('raison').setDescription('Raison du mute').setRequired(true))
         )
-        .addSubcommand(sub => 
+        .addSubcommand(sub =>
             sub.setName('kick')
                .setDescription('Exclure un membre du serveur')
                .addUserOption(o => o.setName('membre').setDescription('Le membre a exclure').setRequired(true))
@@ -61,7 +61,7 @@ module.exports = {
             case 'avertissement':
                 action = 'AVERTISSEMENT OFFICIEL'; 
                 actionColor = 0xF39C12; 
-                detailsAction = 'Un avertissement officiel a ete consigne au dossier du membre.';
+                detailsAction = "Un avertissement officiel a ete consigne au dossier du membre.";
                 break;
             case 'mute':
                 const duree = interaction.options.getInteger('duree');
@@ -85,7 +85,7 @@ module.exports = {
                     await membre.kick(raison);
                     action = 'EXCLUSION DU SERVEUR'; 
                     actionColor = 0xC0392B; 
-                    detailsAction = 'Le membre a ete exclu definitivement du serveur.';
+                    detailsAction = "Le membre a ete exclu definitivement du serveur.";
                 } catch (error) {
                     return interaction.reply({ 
                         content: `[ERREUR] Impossible d'exclure ce membre : ${error.message}`, 
@@ -102,13 +102,13 @@ module.exports = {
             .setTimestamp(date)
             .setThumbnail(membre.user.displayAvatarURL({ size: 256 }))
             .addFields(
-                { name: '[SANCTIONNE] Sanctionne', value: `**${membre.user.username}**\nID: \`${membre.id}\`\nGrade: \`${getHighestGrade(membre)}\``, inline: true },
-                { name: '[AUTORITE] Autorite', value: `**${interaction.user.username}**\nID: \`${interaction.user.id}\`\nGrade: \`${getHighestGrade(interaction.member)}\``, inline: true },
+                { name: '[SANCTIONNE] Sanctionne', value: `**${membre.user.username}**\nIdentifiant : \`${membre.id}\`\nGrade : \`${getHighestGrade(membre)}\``, inline: true },
+                { name: '[AUTORITE] Autorite', value: `**${interaction.user.username}**\nIdentifiant : \`${interaction.user.id}\`\nGrade : \`${getHighestGrade(interaction.member)}\``, inline: true },
                 { name: '[DATE] Date', value: `<t:${Math.floor(date.getTime() / 1000)}:F>`, inline: true },
                 { name: '[MOTIF] Motif officiel', value: raison, inline: false },
                 { name: '[DETAILS] Details', value: detailsAction, inline: false }
             )
-            .setFooter({ text: 'Division Vanguard | Registre disciplinaire officiel' });
+            .setFooter({ text: 'Division Vanguard - Registre disciplinaire officiel' });
 
         await sendToChannel(interaction.client, config.channels.sanctionsDiscipl, { embed: embedPublic });
 
