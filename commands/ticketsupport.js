@@ -1,29 +1,31 @@
 const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
-const { generatePresentationEmbed, generateOpenButton } = require('../utils/ticketManager');
+const { generateTicketEmbed, generateTicketButton } = require('../utils/ticketManager');
+const config = require('../config/guildConfig');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('ticketsupport')
-        .setDescription('Publier l\'embed de support (administration uniquement)')
+        .setDescription('Publier l interface de support dans le salon dedie')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
-        // Verification des permissions
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-            return interaction.reply({
-                content: '[ERREUR] Vous devez avoir la permission Administrateur pour utiliser cette commande.',
-                flags: MessageFlags.Ephemeral
-            });
+            return interaction.reply({ content: '[ERREUR] Permission requise : Administrateur.', flags: MessageFlags.Ephemeral });
         }
 
-        const embed = generatePresentationEmbed('support');
-        const row = generateOpenButton('support');
+        const channel = interaction.guild.channels.cache.get(config.channels.ticketSupportChannel);
+        if (!channel) {
+            return interaction.reply({ content: `[ERREUR] Le salon cible de support est introuvable. Verifiez la configuration.`, flags: MessageFlags.Ephemeral });
+        }
 
-        await interaction.reply({
-            content: '[SUCCES] L\'embed de support a ete publie dans ce salon.',
-            embeds: [embed],
-            components: [row],
-            ephemeral: false
+        const embed = generateTicketEmbed('support');
+        const row = generateTicketButton('support');
+
+        await channel.send({ embeds: [embed], components: [row] });
+
+        await interaction.reply({ 
+            content: '[INFO] L interface de ticket a ete publiee dans le salon dedie.', 
+            flags: MessageFlags.Ephemeral 
         });
     }
 };
