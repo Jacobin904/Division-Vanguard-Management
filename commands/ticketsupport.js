@@ -16,7 +16,7 @@ module.exports = {
     async execute(interaction) {
         if (!estAdministrateur(interaction.member)) {
             return interaction.reply({
-                content: 'Vous n\'êtes pas habilité à publier une interface officielle.',
+                content: "Vous n'êtes pas habilité à publier une interface officielle.",
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -40,7 +40,7 @@ module.exports = {
 
             await logAction(interaction.client, {
                 title: 'PUBLICATION D\'INTERFACE',
-                description: 'L\'interface d\'assistance a été publiée ou actualisée.',
+                description: "L'interface d'assistance a été publiée ou actualisée.",
                 color: COULEURS.information,
                 fields: [
                     { name: 'SALON', value: `<#${salon.id}>`, inline: true },
