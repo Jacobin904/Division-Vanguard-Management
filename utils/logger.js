@@ -13,9 +13,6 @@ async function recupererSalon(client, identifiant) {
     return salon;
 }
 
-/**
- * Diffuse un message dans un salon donné, sans jamais interrompre le traitement.
- */
 async function sendToChannel(client, identifiant, { content, embed, embeds, files, components } = {}) {
     try {
         const salon = await recupererSalon(client, identifiant);
@@ -32,9 +29,6 @@ async function sendToChannel(client, identifiant, { content, embed, embeds, file
     }
 }
 
-/**
- * Consigne un événement administratif dans le salon de journalisation.
- */
 async function logAction(client, { title, description, color = COULEURS.information, fields = [] }) {
     const guild = client.guilds.cache.get(config.guildId);
     const embed = construireEmbed(guild, {
