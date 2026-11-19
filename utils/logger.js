@@ -1,59 +1,52 @@
-const { EmbedBuilder } = require('discord.js');
+'use strict';
+
+const config = require('../config/guildConfig');
+const { COULEURS, construireEmbed } = require('./ui');
+
+async function recupererSalon(client, identifiant) {
+    if (!identifiant) return null;
+    const guild = client.guilds.cache.get(config.guildId);
+    if (!guild) return null;
+    const salon = guild.channels.cache.get(identifiant)
+        || await guild.channels.fetch(identifiant).catch(() => null);
+    if (!salon || !salon.isTextBased()) return null;
+    return salon;
+}
 
 /**
- * Envoie un log dans le salon logs-bot
+ * Diffuse un message dans un salon donné, sans jamais interrompre le traitement.
  */
-async function logAction(client, { title, description, color = 0x5865F2, fields = [] }) {
-    const guild = client.guilds.cache.get('1501671610879312036');
-    if (!guild) return;
-
-    const logsChannel = guild.channels.cache.get('1502321982082125995');
-    if (!logsChannel) return;
-
-    const date = new Date();
-
-    const embed = new EmbedBuilder()
-        .setAuthor({
-            name: `Division Vanguard Management - Journal`,
-            iconURL: guild.iconURL({ size: 64 }) || undefined
-        })
-        .setTitle(`[JOURNAL] ${title}`)
-        .setDescription(description)
-        .setColor(color)
-        .setTimestamp(date)
-        .setFooter({ text: `Division Vanguard - Système de log automatique` });
-
-    if (fields.length > 0) {
-        // Ajouter un séparateur visuel avant les fields
-        const newFields = [
-            { name: '═══════ DÉTAILS ═══════', value: '\u200b', inline: false },
-            ...fields
-        ];
-        embed.addFields(newFields);
-    }
-
+async function sendToChannel(client, identifiant, { content, embed, embeds, files, components } = {}) {
     try {
-        await logsChannel.send({ embeds: [embed] });
-    } catch (error) {
-        console.error('Erreur lors de l\'envoi du log :', error);
+        const salon = await recupererSalon(client, identifiant);
+        if (!salon) return null;
+        return await salon.send({
+            content: content || undefined,
+            embeds: embeds || (embed ? [embed] : undefined),
+            files: files || undefined,
+            components: components || undefined
+        });
+    } catch (erreur) {
+        console.error(`[JOURNAL] Diffusion impossible vers ${identifiant} :`, erreur.message);
+        return null;
     }
 }
 
 /**
- * Envoie un message formaté dans un salon spécifique
+ * Consigne un événement administratif dans le salon de journalisation.
  */
-async function sendToChannel(client, channelId, { content, embed }) {
-    const guild = client.guilds.cache.get('1501671610879312036');
-    if (!guild) return;
+async function logAction(client, { title, description, color = COULEURS.information, fields = [] }) {
+    const guild = client.guilds.cache.get(config.guildId);
+    const embed = construireEmbed(guild, {
+        service: 'Division Vanguard — Journal du service',
+        titre: title,
+        description,
+        couleur: color,
+        champs: fields,
+        pied: 'Division Vanguard — Journalisation automatique'
+    });
 
-    const channel = guild.channels.cache.get(channelId);
-    if (!channel) return;
-
-    try {
-        await channel.send({ content, embeds: embed ? [embed] : undefined });
-    } catch (error) {
-        console.error(`Erreur envoi salon ${channelId} :`, error);
-    }
+    return sendToChannel(client, config.channels.logsBot, { embed });
 }
 
-module.exports = { logAction, sendToChannel };
+module.exports = { logAction, sendToChannel, recupererSalon };
