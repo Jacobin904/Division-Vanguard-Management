@@ -2,10 +2,6 @@
 
 const { EmbedBuilder } = require('discord.js');
 
-/**
- * Charte graphique du service. Aucune émoji n'est employée : la lisibilité
- * repose sur la typographie, les graisses et les blocs de code.
- */
 const COULEURS = {
     institution: 0x2B3A55,
     information: 0x34568B,
@@ -48,9 +44,6 @@ function bloc(titre, lignes) {
     };
 }
 
-/**
- * Construit un embed conforme à la charte de l'institution.
- */
 function construireEmbed(guild, options = {}) {
     const {
         titre,
