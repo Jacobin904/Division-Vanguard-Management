@@ -26,10 +26,6 @@ function peutRapporter(membre) {
     return estAdministrateur(membre) || possedeUnRole(membre, config.rapportRoles);
 }
 
-/**
- * Détermine le grade le plus élevé à partir des identifiants de rôle.
- * Cette méthode reste exacte même après une réorganisation des positions.
- */
 function gradeLePlusEleve(membre) {
     if (!membre?.roles?.cache) return 'Grade non renseigné';
     for (const grade of config.grades) {
@@ -47,9 +43,6 @@ function specialitesObtenues(membre) {
     return obtenues.sort((a, b) => a.localeCompare(b, 'fr'));
 }
 
-/**
- * Vérifie qu'un membre appartient à l'encadrement habilité pour un ticket.
- */
 function peutGererTicket(membre, type, categorie) {
     if (estAdministrateur(membre)) return true;
     const liste =
@@ -61,7 +54,6 @@ function peutGererTicket(membre, type, categorie) {
     return possedeUnRole(membre, liste);
 }
 
-// Alias conservés pour la compatibilité avec les commandes existantes.
 module.exports = {
     isAdmin: estAdministrateur,
     canForm: peutFormer,
