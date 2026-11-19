@@ -12,7 +12,10 @@ module.exports = {
         debriefMission: '1502321949542453360',
         sanctionsInternes: '1502321980387496097',
         sanctionsDiscipl: '1502321975350263838',
-        botCommandes: '1502321945826295927'
+        botCommandes: '1502321945826295927',
+        // A AJOUTER dans la section "channels" existante :
+        rdvCategory: '1503487120332034089',     // Categorie Prendre-Rendez-Vous
+        supportCategory: '1566930356098310307' // Categorie Support
     },
 
     // Roles d'administration (peuvent utiliser TOUTES les commandes)
