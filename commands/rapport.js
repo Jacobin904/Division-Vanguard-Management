@@ -1,18 +1,20 @@
+'use strict';
+
 const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../config/guildConfig');
-const { canRapport, getHighestGrade } = require('../utils/permissions');
+const { peutRapporter, gradeLePlusEleve } = require('../utils/permissions');
 const { sendToChannel } = require('../utils/logger');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('rapport')
-        .setDescription('Rediger un rapport de mission officiel (officiers et sous-officiers)')
+        .setDescription('Rédiger un rapport de mission officiel (officiers et sous-officiers)')
         .setDefaultMemberPermissions(0),
 
     async execute(interaction) {
-        if (!canRapport(interaction.member)) {
+        if (!peutRapporter(interaction.member)) {
             return interaction.reply({ 
-                content: '[ERREUR] Permissions insuffisantes. Seuls les sous-officiers et officiers peuvent rediger un rapport.', 
+                content: '[ERREUR] Permissions insuffisantes. Seuls les sous-officiers et officiers peuvent rédiger un rapport.', 
                 flags: MessageFlags.Ephemeral 
             });
         }
@@ -25,16 +27,16 @@ module.exports = {
             new ActionRowBuilder().addComponents(
                 new TextInputBuilder()
                     .setCustomId('nom_operation')
-                    .setLabel("Nom de code de l'operation")
+                    .setLabel("Nom de code de l'opération")
                     .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('Ex : Operation Tempete')
+                    .setPlaceholder('Ex : Opération Tempête')
                     .setMaxLength(100)
                     .setRequired(true)
             ),
             new ActionRowBuilder().addComponents(
                 new TextInputBuilder()
                     .setCustomId('operateurs')
-                    .setLabel('Operateurs presents (noms)')
+                    .setLabel('Opérateurs présents (noms)')
                     .setStyle(TextInputStyle.Paragraph)
                     .setPlaceholder('Ex : Jacobin904, Felix')
                     .setMaxLength(1000)
@@ -43,18 +45,18 @@ module.exports = {
             new ActionRowBuilder().addComponents(
                 new TextInputBuilder()
                     .setCustomId('resultat')
-                    .setLabel('Resultat (SUCCES / ECHEC / PARTIEL)')
+                    .setLabel('Résultat (SUCCÈS / ÉCHEC / PARTIEL)')
                     .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('SUCCES')
+                    .setPlaceholder('SUCCÈS')
                     .setMaxLength(50)
                     .setRequired(true)
             ),
             new ActionRowBuilder().addComponents(
                 new TextInputBuilder()
                     .setCustomId('details')
-                    .setLabel('Details et incidents')
+                    .setLabel('Détails et incidents')
                     .setStyle(TextInputStyle.Paragraph)
-                    .setPlaceholder('Deroulement, pertes, objectifs...')
+                    .setPlaceholder('Déroulement, pertes, objectifs...')
                     .setMaxLength(2000)
                     .setRequired(false)
             )
@@ -68,41 +70,41 @@ async function handleRapportModal(interaction) {
     const nomOp = interaction.fields.getTextInputValue('nom_operation');
     const operateurs = interaction.fields.getTextInputValue('operateurs');
     const resultat = interaction.fields.getTextInputValue('resultat');
-    const details = interaction.fields.getTextInputValue('details') || 'Aucun incident signale.';
+    const details = interaction.fields.getTextInputValue('details') || 'Aucun incident signalé.';
     const date = new Date();
     const operateursCount = operateurs.split(',').map(o => o.trim()).filter(o => o.length > 0).length;
 
     let actionColor = 0xF39C12;
     const resultatUpper = resultat.toUpperCase();
     if (resultatUpper.includes('SUCC')) {
-        actionColor = 0x2ECC71;
+        actionColor = 0x2E7D32;
     } else if (resultatUpper.includes('ECHEC')) {
         actionColor = 0xC0392B;
     }
 
     const embedRapport = new EmbedBuilder()
         .setAuthor({ 
-            name: 'Division Vanguard - Rapport de Mission', 
+            name: 'Division Vanguard — Rapport de Mission', 
             iconURL: interaction.guild.iconURL({ size: 64 }) || undefined 
         })
         .setTitle(`[RAPPORT] ${nomOp}`)
         .setColor(actionColor)
         .setTimestamp(date)
         .addFields(
-            { name: '[INFO] Identification', value: `**Operation :** \`${nomOp}\`\n**Resultat :** \`${resultatUpper}\`\n**Date :** <t:${Math.floor(date.getTime() / 1000)}:F>`, inline: true },
-            { name: '[CMD] Commandement', value: `**Chef de mission :** ${interaction.user.username}\n**Grade :** \`${getHighestGrade(interaction.member)}\`\n**Effectif :** \`${operateursCount}\` operateur(s)`, inline: true },
-            { name: '[DETAILS] Details de la mission', value: details, inline: false },
-            { name: '[EFFECTIF] Operateurs engages', value: operateurs, inline: false }
+            { name: '[INFO] Identification', value: `**Opération :** \`${nomOp}\`\n**Résultat :** \`${resultatUpper}\`\n**Date :** <t:${Math.floor(date.getTime() / 1000)}:F>`, inline: true },
+            { name: '[CMD] Commandement', value: `**Chef de mission :** ${interaction.user.username}\n**Grade :** \`${gradeLePlusEleve(interaction.member)}\`\n**Effectif :** \`${operateursCount}\` opérateur(s)`, inline: true },
+            { name: '[DÉTAILS] Détails de la mission', value: details, inline: false },
+            { name: '[EFFECTIF] Opérateurs engagés', value: operateurs, inline: false }
         )
-        .setFooter({ text: 'Division Vanguard - Archives des operations' });
+        .setFooter({ text: 'Division Vanguard — Archives des opérations' });
 
     await sendToChannel(interaction.client, config.channels.rapportsMission, { embed: embedRapport });
 
     const embedConfirmation = new EmbedBuilder()
-        .setTitle('[SUCCES] Rapport transmis')
-        .setColor(0x2ECC71)
-        .setDescription(`Le rapport de l'operation \`${nomOp}\` a ete archive dans <#${config.channels.rapportsMission}>.`)
-        .setFooter({ text: 'Division Vanguard - Systeme de rapport' });
+        .setTitle('[SUCCÈS] Rapport transmis')
+        .setColor(0x2E7D32)
+        .setDescription(`Le rapport de l'opération \`${nomOp}\` a été archivé dans <#${config.channels.rapportsMission}>.`)
+        .setFooter({ text: 'Division Vanguard — Système de rapport' });
 
     await interaction.reply({ 
         embeds: [embedConfirmation], 
