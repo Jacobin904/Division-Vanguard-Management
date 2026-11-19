@@ -9,14 +9,14 @@ const { logAction } = require('../utils/logger');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('ticketrdv')
-        .setDescription('Publier l interface officielle de prise de rendez-vous dans le salon prévu à cet effet.')
+        .setDescription('Publier l\'interface officielle de prise de rendez-vous dans le salon prévu à cet effet.')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .setDMPermission(false),
 
     async execute(interaction) {
         if (!estAdministrateur(interaction.member)) {
             return interaction.reply({
-                content: "Vous n'êtes pas habilité à publier une interface officielle.",
+                content: 'Vous n\'êtes pas habilité à publier une interface officielle.',
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -32,15 +32,15 @@ module.exports = {
                         service: 'Division Vanguard — Administration',
                         titre: 'INTERFACE PUBLIÉE',
                         couleur: COULEURS.succes,
-                        description: `L interface de prise de rendez-vous est désormais disponible dans <#${salon.id}>.`,
+                        description: `L'interface de prise de rendez-vous est désormais disponible dans <#${salon.id}>.`,
                         pied: 'Division Vanguard — Confirmation administrative'
                     })
                 ]
             });
 
             await logAction(interaction.client, {
-                title: 'PUBLICATION D INTERFACE',
-                description: "L interface de prise de rendez-vous a été publiée ou actualisée.",
+                title: 'PUBLICATION D\'INTERFACE',
+                description: 'L\'interface de prise de rendez-vous a été publiée ou actualisée.',
                 color: COULEURS.information,
                 fields: [
                     { name: 'SALON', value: `<#${salon.id}>`, inline: true },
