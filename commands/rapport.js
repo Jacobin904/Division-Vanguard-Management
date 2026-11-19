@@ -1,12 +1,12 @@
 const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../config/guildConfig');
 const { canRapport, getHighestGrade } = require('../utils/permissions');
-const { logAction, sendToChannel } = require('../utils/logger');
+const { sendToChannel } = require('../utils/logger');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('rapport')
-        .setDescription('Rediger un rapport de mission officiel (officiers/sous-officiers)')
+        .setDescription('Rediger un rapport de mission officiel (officiers et sous-officiers)')
         .setDefaultMemberPermissions(0),
 
     async execute(interaction) {
@@ -94,7 +94,7 @@ async function handleRapportModal(interaction) {
             { name: '[DETAILS] Details de la mission', value: details, inline: false },
             { name: '[EFFECTIF] Operateurs engages', value: operateurs, inline: false }
         )
-        .setFooter({ text: 'Division Vanguard | Archives des operations' });
+        .setFooter({ text: 'Division Vanguard - Archives des operations' });
 
     await sendToChannel(interaction.client, config.channels.rapportsMission, { embed: embedRapport });
 
