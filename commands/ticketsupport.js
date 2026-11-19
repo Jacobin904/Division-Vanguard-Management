@@ -5,7 +5,7 @@ const config = require('../config/guildConfig');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('ticketsupport')
-        .setDescription('Publier l interface de support dans le salon dedie')
+        .setDescription("Publier l interface de support dans le salon dedie")
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
@@ -15,7 +15,7 @@ module.exports = {
 
         const channel = interaction.guild.channels.cache.get(config.channels.ticketSupportChannel);
         if (!channel) {
-            return interaction.reply({ content: `[ERREUR] Le salon cible de support est introuvable. Verifiez la configuration.`, flags: MessageFlags.Ephemeral });
+            return interaction.reply({ content: '[ERREUR] Le salon cible de support est introuvable. Verifiez la configuration.', flags: MessageFlags.Ephemeral });
         }
 
         const embed = generateTicketEmbed('support');
