@@ -16,7 +16,7 @@ async function repondreErreur(interaction, erreur) {
             await interaction.reply(charge);
         }
     } catch (e) {
-        console.error('[INTERACTION] Réponse d erreur impossible :', e.message);
+        console.error('[INTERACTION] Réponse d\'erreur impossible :', e.message);
     }
 }
 
@@ -25,7 +25,6 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            /* Commandes applicatives */
             if (interaction.isChatInputCommand()) {
                 const commande = interaction.client.commands.get(interaction.commandName);
                 if (!commande) return;
@@ -33,7 +32,6 @@ module.exports = {
                 return;
             }
 
-            /* Autocomplétion */
             if (interaction.isAutocomplete()) {
                 const commande = interaction.client.commands.get(interaction.commandName);
                 if (!commande?.autocomplete) return;
@@ -41,7 +39,6 @@ module.exports = {
                 return;
             }
 
-            /* Boutons */
             if (interaction.isButton()) {
                 const [domaine, module, action, parametre] = interaction.customId.split(':');
                 if (domaine !== 'dv' || module !== 'ticket') return;
@@ -71,7 +68,6 @@ module.exports = {
                 return;
             }
 
-            /* Menus déroulants */
             if (interaction.isStringSelectMenu()) {
                 if (interaction.customId === 'dv:ticket:destinataire:support') {
                     return interaction.showModal(tickets.construireFormulaire('support', interaction.values[0]));
@@ -79,7 +75,6 @@ module.exports = {
                 return;
             }
 
-            /* Fenêtres modales */
             if (interaction.isModalSubmit()) {
                 if (interaction.customId === 'rapport_mission_modal') {
                     return handleRapportModal(interaction);
@@ -106,7 +101,7 @@ module.exports = {
                     });
 
                     const message = resultat.dejaExistant
-                        ? `Vous disposez déjà d un dossier ouvert pour ce service : <#${resultat.salon.id}>. Merci de poursuivre vos échanges dans ce salon.`
+                        ? `Vous disposez déjà d\'un dossier ouvert pour ce service : <#${resultat.salon.id}>. Merci de poursuivre vos échanges dans ce salon.`
                         : `Votre dossier ${resultat.ticket.reference} a été enregistré. Rendez-vous dans <#${resultat.salon.id}> pour poursuivre vos échanges.`;
 
                     return interaction.editReply({ content: message });
