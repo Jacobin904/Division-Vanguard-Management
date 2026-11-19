@@ -1,8 +1,6 @@
-// Configuration specifique au serveur Division Vanguard
 module.exports = {
     guildId: '1501671610879312036',
 
-    // Salons
     channels: {
         logsBot: '1502321982082125995',
         carteIdentite: '1568436661635911760',
@@ -13,35 +11,28 @@ module.exports = {
         sanctionsInternes: '1502321980387496097',
         sanctionsDiscipl: '1502321975350263838',
         botCommandes: '1502321945826295927',
-        // A AJOUTER dans la section "channels" existante :
-        rdvCategory: '1503487120332034089',     // Categorie Prendre-Rendez-Vous
-        supportCategory: '1566930356098310307' // Categorie Support
+        // Salons où les embeds de tickets seront envoyés automatiquement
+        ticketRdvChannel: '1503487120332034089', 
+        ticketSupportChannel: '1566930356098310307',
+        // Catégories où les salons de tickets seront créés (à adapter si besoin)
+        rdvCategory: '1503487120332034089',     
+        supportCategory: '1566930356098310307' 
     },
 
-    // Roles d'administration (peuvent utiliser TOUTES les commandes)
     adminRoles: [
-        '1502329914224017710', // Fondation
-        '1502321922590113892', // Administration
-        '1502321921113460827', // Admin Interne
-        '1502321894462980257', // Admin Externe
-        '1502321920652345484'  // Directeur
+        '1502329914224017710', '1502321922590113892', '1502321921113460827', 
+        '1502321894462980257', '1502321920652345484'
     ],
 
-    // Roles qui peuvent former des membres (officiers generaux et superieurs)
     formationRoles: [
-        '1502329914224017710', // Fondation
-        '1502321922590113892', // Administration
-        '1502321921113460827', // Admin Interne
-        '1502321894462980257', // Admin Externe
-        '1502321920652345484', // Directeur
-        '1502321913169707089', // General Armee
-        '1502321912314073251', // General de Corps Armee
-        '1502321911433138387', // General de Division
-        '1502321910665580745', // General de Brigade
-        '1502321909596033156', // Colonel
-        '1502321908966887424', // Lieutenant-Colonel
-        '1502321908182552647'  // Commandant
+        '1502329914224017710', '1502321922590113892', '1502321921113460827', 
+        '1502321894462980257', '1502321920652345484', '1502321913169707089', 
+        '1502321912314073251', '1502321911433138387', '1502321910665580745', 
+        '1502321909596033156', '1502321908966887424', '1502321908182552647'
     ],
+    
+    // ... (le reste de ton fichier specialites et grades reste inchangé)
+};
 
     // Roles qui peuvent sanctionner (officiers + sous-officiers)
     sanctionRoles: [
