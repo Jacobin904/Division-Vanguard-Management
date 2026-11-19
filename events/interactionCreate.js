@@ -1,4 +1,4 @@
-const { Events, MessageFlags } = require('discord.js');
+const { Events, MessageFlags, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const { handleRapportModal } = require('../commands/rapport');
 const {
     generateCategorySelect,
@@ -63,7 +63,6 @@ module.exports = {
                     return interaction.reply({ content: '[ERREUR] Salon introuvable.', flags: MessageFlags.Ephemeral });
                 }
 
-                const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
                 const confirmRow = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`ticket_confirm_close_${channelId}`).setLabel('Confirmer la fermeture').setStyle(ButtonStyle.Danger),
                     new ButtonBuilder().setCustomId('ticket_cancel_close').setLabel('Annuler').setStyle(ButtonStyle.Secondary)
