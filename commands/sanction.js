@@ -1,6 +1,8 @@
+'use strict';
+
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../config/guildConfig');
-const { canSanction, getHighestGrade } = require('../utils/permissions');
+const { peutSanctionner, gradeLePlusEleve } = require('../utils/permissions');
 const { logAction, sendToChannel } = require('../utils/logger');
 
 module.exports = {
@@ -10,26 +12,26 @@ module.exports = {
         .addSubcommand(sub =>
             sub.setName('avertissement')
                .setDescription('Donner un avertissement officiel')
-               .addUserOption(o => o.setName('membre').setDescription('Le membre a sanctionner').setRequired(true))
+               .addUserOption(o => o.setName('membre').setDescription('Le membre à sanctionner').setRequired(true))
                .addStringOption(o => o.setName('raison').setDescription('Raison de la sanction').setRequired(true))
         )
         .addSubcommand(sub =>
             sub.setName('mute')
                .setDescription('Rendre muet un membre temporairement')
-               .addUserOption(o => o.setName('membre').setDescription('Le membre a rendre muet').setRequired(true))
-               .addIntegerOption(o => o.setName('duree').setDescription('Duree en minutes').setRequired(true))
+               .addUserOption(o => o.setName('membre').setDescription('Le membre à rendre muet').setRequired(true))
+               .addIntegerOption(o => o.setName('duree').setDescription('Durée en minutes').setRequired(true))
                .addStringOption(o => o.setName('raison').setDescription('Raison du mute').setRequired(true))
         )
         .addSubcommand(sub =>
             sub.setName('kick')
                .setDescription('Exclure un membre du serveur')
-               .addUserOption(o => o.setName('membre').setDescription('Le membre a exclure').setRequired(true))
+               .addUserOption(o => o.setName('membre').setDescription('Le membre à exclure').setRequired(true))
                .addStringOption(o => o.setName('raison').setDescription("Raison de l'exclusion").setRequired(true))
         )
         .setDefaultMemberPermissions(0),
 
     async execute(interaction) {
-        if (!canSanction(interaction.member)) {
+        if (!peutSanctionner(interaction.member)) {
             return interaction.reply({ 
                 content: "[ERREUR] Permissions insuffisantes. Seuls les sous-officiers et officiers peuvent sanctionner.", 
                 flags: MessageFlags.Ephemeral 
@@ -50,7 +52,7 @@ module.exports = {
 
         if (membre.roles.highest.position >= interaction.member.roles.highest.position && !interaction.member.roles.cache.some(r => config.adminRoles.includes(r.id))) {
             return interaction.reply({ 
-                content: "[ERREUR] Vous ne pouvez pas sanctionner un membre ayant un grade egal ou superieur au votre.", 
+                content: "[ERREUR] Vous ne pouvez pas sanctionner un membre ayant un grade égal ou supérieur au vôtre.", 
                 flags: MessageFlags.Ephemeral 
             });
         }
@@ -61,7 +63,7 @@ module.exports = {
             case 'avertissement':
                 action = 'AVERTISSEMENT OFFICIEL'; 
                 actionColor = 0xF39C12; 
-                detailsAction = "Un avertissement officiel a ete consigne au dossier du membre.";
+                detailsAction = "Un avertissement officiel a été consigné au dossier du membre.";
                 break;
             case 'mute':
                 const duree = interaction.options.getInteger('duree');
@@ -69,7 +71,7 @@ module.exports = {
                     await membre.timeout(duree * 60 * 1000, raison);
                     action = 'MUTE TEMPORAIRE'; 
                     actionColor = 0xE67E22; 
-                    detailsAction = `Le membre a ete rendu muet pour une duree de ${duree} minute(s).`;
+                    detailsAction = `Le membre a été rendu muet pour une durée de ${duree} minute(s).`;
                 } catch (error) {
                     return interaction.reply({ 
                         content: `[ERREUR] Impossible de mute ce membre : ${error.message}`, 
@@ -80,12 +82,12 @@ module.exports = {
             case 'kick':
                 try {
                     await membre.send({ 
-                        content: `[NOTIFICATION] Vous avez ete exclu du serveur Division Vanguard.\n\nRaison : ${raison}\nAutorite : ${interaction.user.username}\nDate : ${date.toUTCString()}` 
+                        content: `[NOTIFICATION] Vous avez été exclu du serveur Division Vanguard.\n\nRaison : ${raison}\nAutorité : ${interaction.user.username}\nDate : ${date.toUTCString()}` 
                     }).catch(() => {});
                     await membre.kick(raison);
                     action = 'EXCLUSION DU SERVEUR'; 
                     actionColor = 0xC0392B; 
-                    detailsAction = "Le membre a ete exclu definitivement du serveur.";
+                    detailsAction = "Le membre a été exclu définitivement du serveur.";
                 } catch (error) {
                     return interaction.reply({ 
                         content: `[ERREUR] Impossible d'exclure ce membre : ${error.message}`, 
@@ -102,21 +104,21 @@ module.exports = {
             .setTimestamp(date)
             .setThumbnail(membre.user.displayAvatarURL({ size: 256 }))
             .addFields(
-                { name: '[SANCTIONNE] Sanctionne', value: `**${membre.user.username}**\nIdentifiant : \`${membre.id}\`\nGrade : \`${getHighestGrade(membre)}\``, inline: true },
-                { name: '[AUTORITE] Autorite', value: `**${interaction.user.username}**\nIdentifiant : \`${interaction.user.id}\`\nGrade : \`${getHighestGrade(interaction.member)}\``, inline: true },
+                { name: '[SANCTIONNÉ] Sanctionné', value: `**${membre.user.username}**\nIdentifiant : \`${membre.id}\`\nGrade : \`${gradeLePlusEleve(membre)}\``, inline: true },
+                { name: '[AUTORITÉ] Autorité', value: `**${interaction.user.username}**\nIdentifiant : \`${interaction.user.id}\`\nGrade : \`${gradeLePlusEleve(interaction.member)}\``, inline: true },
                 { name: '[DATE] Date', value: `<t:${Math.floor(date.getTime() / 1000)}:F>`, inline: true },
                 { name: '[MOTIF] Motif officiel', value: raison, inline: false },
-                { name: '[DETAILS] Details', value: detailsAction, inline: false }
+                { name: '[DÉTAILS] Détails', value: detailsAction, inline: false }
             )
-            .setFooter({ text: 'Division Vanguard - Registre disciplinaire officiel' });
+            .setFooter({ text: 'Division Vanguard — Registre disciplinaire officiel' });
 
         await sendToChannel(interaction.client, config.channels.sanctionsDiscipl, { embed: embedPublic });
 
         const embedConfirmation = new EmbedBuilder()
-            .setTitle(`[SUCCES] Sanction appliquee`)
+            .setTitle(`[SUCCÈS] Sanction appliquée`)
             .setColor(actionColor)
-            .setDescription(`La sanction **${action}** a ete appliquee a **${membre.user.username}** et enregistree dans les registres.`)
-            .setFooter({ text: 'Division Vanguard - Registre disciplinaire' });
+            .setDescription(`La sanction **${action}** a été appliquée à **${membre.user.username}** et enregistrée dans les registres.`)
+            .setFooter({ text: 'Division Vanguard — Registre disciplinaire' });
 
         await interaction.reply({ embeds: [embedConfirmation], flags: MessageFlags.Ephemeral });
     }
