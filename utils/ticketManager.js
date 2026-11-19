@@ -16,8 +16,8 @@ const {
 } = require('discord.js');
 
 const config = require('../config/guildConfig');
-const { peutGererTicket, gradeLePlusEleve } = require('./permissions');
-const { sendToChannel } = require('./logger');
+const { peutGererTicket, gradeLePlusEleve } = require('../utils/permissions');
+const { sendToChannel } = require('../utils/logger');
 const {
     COULEURS,
     bloc,
@@ -27,15 +27,11 @@ const {
     horodatageRelatif,
     ligne,
     tronquer
-} = require('./ui');
+} = require('../utils/ui');
 
 const DOSSIER_DONNEES = path.join(__dirname, '..', 'data');
 const FICHIER_TICKETS = path.join(DOSSIER_DONNEES, 'tickets.json');
 const verrousCloture = new Set();
-
-/* ------------------------------------------------------------------ */
-/* Persistance                                                         */
-/* ------------------------------------------------------------------ */
 
 function structureInitiale() {
     return { compteurs: { rdv: 0, support: 0 }, panneaux: {}, actifs: {}, archives: [] };
@@ -80,10 +76,6 @@ function referenceSuivante(type) {
     return `${prefixe}-${String(donnees.compteurs[type]).padStart(4, '0')}`;
 }
 
-/* ------------------------------------------------------------------ */
-/* Libellés                                                            */
-/* ------------------------------------------------------------------ */
-
 function libelleType(type) {
     return type === 'rdv' ? 'Rendez-vous' : 'Assistance';
 }
@@ -111,17 +103,13 @@ function assainirNom(valeur) {
         .slice(0, 24) || 'membre';
 }
 
-/* ------------------------------------------------------------------ */
-/* Interfaces publiques                                                */
-/* ------------------------------------------------------------------ */
-
 function construirePanneau(guild, type) {
     const estRdv = type === 'rdv';
 
     const embed = construireEmbed(guild, {
         service: estRdv
             ? 'Division Vanguard — Service des rendez-vous'
-            : 'Division Vanguard — Service d assistance',
+            : 'Division Vanguard — Service d\'assistance',
         titre: estRdv ? 'PRISE DE RENDEZ-VOUS' : 'ASSISTANCE ET SIGNALEMENTS',
         couleur: estRdv ? COULEURS.information : COULEURS.attention,
         description: estRdv
@@ -134,13 +122,13 @@ function construirePanneau(guild, type) {
             bloc('Procédure', [
                 '**1.** Appuyez sur le bouton « Ouvrir un ticket ».',
                 estRdv
-                    ? '**2.** Renseignez l objet et le motif de votre entretien.'
+                    ? '**2.** Renseignez l\'objet et le motif de votre entretien.'
                     : '**2.** Sélectionnez le service destinataire, puis renseignez le formulaire.',
                 '**3.** Un salon privé est créé et le service compétent est avisé.'
             ]),
             bloc('Traitement des demandes', [
                 ligne('Délai indicatif', 'vingt-quatre à quarante-huit heures ouvrables'),
-                ligne('Confidentialité', 'accès restreint au requérant et à l encadrement'),
+                ligne('Confidentialité', 'accès restreint au requérant et à l\'encadrement'),
                 ligne('Clôture', 'une transcription horodatée est archivée automatiquement')
             ]),
             bloc('Rappel', [
@@ -186,20 +174,20 @@ function construireFormulaire(type, categorie) {
 
     const modal = new ModalBuilder()
         .setCustomId(`dv:ticket:formulaire:${type}:${suffixe}`)
-        .setTitle(estRdv ? 'Demande de rendez-vous' : 'Demande d assistance');
+        .setTitle(estRdv ? 'Demande de rendez-vous' : 'Demande d\'assistance');
 
     const objet = new TextInputBuilder()
         .setCustomId('objet')
         .setLabel('Objet de la demande')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder(estRdv ? 'Exemple : entretien de recrutement' : 'Exemple : signalement d un comportement')
+        .setPlaceholder(estRdv ? 'Exemple : entretien de recrutement' : 'Exemple : signalement d\'un comportement')
         .setMinLength(5)
         .setMaxLength(100)
         .setRequired(true);
 
     const motif = new TextInputBuilder()
         .setCustomId('motif')
-        .setLabel(estRdv ? 'Motif de l entretien' : 'Description détaillée')
+        .setLabel(estRdv ? 'Motif de l\'entretien' : 'Description détaillée')
         .setStyle(TextInputStyle.Paragraph)
         .setPlaceholder('Exposez votre demande de manière précise et factuelle.')
         .setMinLength(20)
@@ -222,10 +210,6 @@ function construireFormulaire(type, categorie) {
 
     return modal;
 }
-
-/* ------------------------------------------------------------------ */
-/* Publication des panneaux                                            */
-/* ------------------------------------------------------------------ */
 
 async function publierPanneau(guild, type) {
     const identifiant = type === 'rdv'
@@ -260,10 +244,6 @@ async function publierPanneau(guild, type) {
     return { salon, message };
 }
 
-/* ------------------------------------------------------------------ */
-/* Création des tickets                                                */
-/* ------------------------------------------------------------------ */
-
 function ticketOuvertPar(userId, type) {
     const donnees = charger();
     return Object.values(donnees.actifs).find(
@@ -271,32 +251,14 @@ function ticketOuvertPar(userId, type) {
     ) || null;
 }
 
-/**
- * Résout une catégorie parente valide. Cette vérification empêche l'erreur
- * Discord 50035 relative au champ parent_id.
- */
-async function resoudreCategorie(guild, type) {
+async function resoudreCategorie(guild) {
     const candidate = config.tickets.categoryId;
     if (candidate) {
         const canal = guild.channels.cache.get(candidate)
             || await guild.channels.fetch(candidate).catch(() => null);
         if (canal?.type === ChannelType.GuildCategory) return canal.id;
-        console.warn('[TICKETS] La catégorie configurée est invalide : détection automatique appliquée.');
+        console.warn('[TICKETS] La catégorie configurée est invalide. Création sans catégorie parente.');
     }
-
-    const identifiantPanneau = type === 'rdv'
-        ? config.channels.ticketRdvChannel
-        : config.channels.ticketSupportChannel;
-
-    const panneau = guild.channels.cache.get(identifiantPanneau)
-        || await guild.channels.fetch(identifiantPanneau).catch(() => null);
-
-    if (panneau?.parentId) {
-        const parent = guild.channels.cache.get(panneau.parentId)
-            || await guild.channels.fetch(panneau.parentId).catch(() => null);
-        if (parent?.type === ChannelType.GuildCategory) return parent.id;
-    }
-
     return null;
 }
 
@@ -316,7 +278,7 @@ async function creerTicket({ guild, membre, type, categorie, objet, motif, compl
     }
 
     const reference = referenceSuivante(type);
-    const parentId = await resoudreCategorie(guild, type);
+    const parentId = await resoudreCategorie(guild);
     const nom = `${type === 'rdv' ? 'rdv' : 'sup'}-${reference.split('-')[1]}-${assainirNom(membre.user.username)}`;
 
     const lecture = [
@@ -440,10 +402,6 @@ async function creerTicket({ guild, membre, type, categorie, objet, motif, compl
     return { salon, dejaExistant: false, ticket };
 }
 
-/* ------------------------------------------------------------------ */
-/* Prise en charge                                                     */
-/* ------------------------------------------------------------------ */
-
 async function prendreEnCharge(interaction) {
     const donnees = charger();
     const ticket = donnees.actifs[interaction.channel.id];
@@ -491,10 +449,6 @@ async function prendreEnCharge(interaction) {
         ]
     });
 }
-
-/* ------------------------------------------------------------------ */
-/* Clôture et transcription                                            */
-/* ------------------------------------------------------------------ */
 
 async function construireTranscription(channel, ticket) {
     const lignes = [
@@ -565,7 +519,7 @@ async function demanderCloture(interaction) {
     const estAuteur = ticket.auteurId === interaction.user.id;
     if (!estAuteur && !peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
         return interaction.reply({
-            content: 'Seuls le requérant et l encadrement habilité peuvent clôturer ce dossier.',
+            content: 'Seuls le requérant et l\'encadrement habilité peuvent clôturer ce dossier.',
             ephemeral: true
         });
     }
@@ -582,7 +536,7 @@ async function demanderCloture(interaction) {
     );
 
     return interaction.reply({
-        content: `La clôture du ticket ${ticket.reference} entraîne l archivage de la transcription puis la suppression du salon. Confirmez-vous cette opération ?`,
+        content: `La clôture du ticket ${ticket.reference} entraîne l\'archivage de la transcription puis la suppression du salon. Confirmez-vous cette opération ?`,
         components: [confirmation],
         ephemeral: true
     });
