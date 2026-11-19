@@ -30,18 +30,18 @@ module.exports = {
             return interaction.reply({ content: "[ERREUR] Vous ne pouvez pas sanctionner un membre ayant un grade egal ou superieur au votre.", flags: MessageFlags.Ephemeral });
         }
 
-        let action = '', actionColor = 0xffaa00, detailsAction = '';
+        let action = '', actionColor = 0xffaa00, actionEmoji = '', detailsAction = '';
 
         switch (sub) {
             case 'avertissement':
-                action = 'AVERTISSEMENT OFFICIEL'; actionColor = 0xF39C12;
+                action = 'AVERTISSEMENT OFFICIEL'; actionColor = 0xF39C12; actionEmoji = '⚠️';
                 detailsAction = 'Un avertissement officiel a ete consigne au dossier du membre.';
                 break;
             case 'mute':
                 const duree = interaction.options.getInteger('duree');
                 try {
                     await membre.timeout(duree * 60 * 1000, raison);
-                    action = 'MUTE TEMPORAIRE'; actionColor = 0xE67E22;
+                    action = 'MUTE TEMPORAIRE'; actionColor = 0xE67E22; actionEmoji = '🔇';
                     detailsAction = `Le membre a ete rendu muet pour une duree de ${duree} minute(s).`;
                 } catch (error) {
                     return interaction.reply({ content: `[ERREUR] Impossible de mute ce membre : ${error.message}`, flags: MessageFlags.Ephemeral });
@@ -51,7 +51,7 @@ module.exports = {
                 try {
                     await membre.send({ content: `[NOTIFICATION] Vous avez ete exclu du serveur Division Vanguard.\n\nRaison : ${raison}\nAutorite : ${interaction.user.username}\nDate : ${date.toUTCString()}` }).catch(() => {});
                     await membre.kick(raison);
-                    action = 'EXCLUSION DU SERVEUR'; actionColor = 0xC0392B;
+                    action = 'EXCLUSION DU SERVEUR'; actionColor = 0xC0392B; actionEmoji = '🚫';
                     detailsAction = 'Le membre a ete exclu definitivement du serveur.';
                 } catch (error) {
                     return interaction.reply({ content: `[ERREUR] Impossible d'exclure ce membre : ${error.message}`, flags: MessageFlags.Ephemeral });
@@ -61,9 +61,27 @@ module.exports = {
 
         const embedPublic = new EmbedBuilder()
             .setAuthor({ name: 'Registre Disciplinaire', iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
-            .setTitle(`[SANCTION] ${action}`)
+            .setTitle(`${actionEmoji} [SANCTION] ${action}`)
             .setColor(actionColor)
             .setTimestamp(date)
             .setThumbnail(membre.user.displayAvatarURL({ size: 256 }))
             .addFields(
-                { name: '[SANCTIONNE] Sanctionne', value: `**${membre.user.username}**\nID: \`${membre.id}\`\nGrade
+                { name: '[SANCTIONNE] Sanctionne', value: `**${membre.user.username}**\nID: \`${membre.id}\`\nGrade: \`${getHighestGrade(membre)}\``, inline: true },
+                { name: '[AUTORITE] Autorite', value: `**${interaction.user.username}**\nID: \`${interaction.user.id}\`\nGrade: \`${getHighestGrade(interaction.member)}\``, inline: true },
+                { name: '[DATE] Date', value: `<t:${Math.floor(date.getTime() / 1000)}:F>`, inline: true },
+                { name: '[MOTIF] Motif officiel', value: raison, inline: false },
+                { name: '[DETAILS] Details', value: detailsAction, inline: false }
+            )
+            .setFooter({ text: 'Division Vanguard | Registre disciplinaire officiel' });
+
+        await sendToChannel(interaction.client, config.channels.sanctionsDiscipl, { embed: embedPublic });
+
+        const embedConfirmation = new EmbedBuilder()
+            .setTitle(`${actionEmoji} [SUCCES] Sanction appliquee`)
+            .setColor(actionColor)
+            .setDescription(`La sanction **${action}** a ete appliquee a **${membre.user.username}** et enregistree dans les registres.`)
+            .setFooter({ text: 'Division Vanguard - Registre disciplinaire' });
+
+        await interaction.reply({ embeds: [embedConfirmation], flags: MessageFlags.Ephemeral });
+    }
+};
