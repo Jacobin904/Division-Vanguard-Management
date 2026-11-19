@@ -1,10 +1,3 @@
-'use strict';
-
-/**
- * Configuration officielle — Division Vanguard
- * Tous les identifiants proviennent du registre du serveur.
- * Aucune donnée sensible ne doit figurer dans ce fichier.
- */
 module.exports = {
     guildId: '1501671610879312036',
 
@@ -19,62 +12,44 @@ module.exports = {
         sanctionsInternes: '1502321980387496097',
         sanctionsDiscipl: '1502321975350263838',
         botCommandes: '1502321945826295927',
-
-        // Salons de destination des interfaces de ticket.
         ticketRdvChannel: '1503487120332034089',
         ticketSupportChannel: '1566930356098310307'
     },
 
     tickets: {
-        /**
-         * Catégorie parente des salons de ticket.
-         * La valeur null active la détection automatique : le bot utilise la
-         * catégorie du salon de destination, puis se rabat sur une création
-         * sans catégorie si aucune catégorie valide n'est disponible.
-         * Renseigner un identifiant de catégorie (type 4) pour forcer l'emplacement.
-         */
         categoryId: null,
-
-        // Nombre maximal de tickets ouverts simultanément par membre.
         maxOuvertsParMembre: 1,
-
-        // Nombre maximal de messages retranscrits lors de la clôture.
         limiteTranscription: 500,
-
-        // Délai avant suppression du salon, en secondes.
         delaiSuppression: 8,
-
-        // Rôles habilités à prendre en charge et à clôturer un ticket.
         encadrement: {
             rdv: [
-                '1502329914224017710', // Fondation
-                '1502321921113460827', // Admin interne
-                '1502321894462980257', // Manager de communauté
-                '1503124531391365203', // CIRFA
-                '1507547514264485969'  // CIRFA (spécialité)
+                '1502329914224017710',
+                '1502321921113460827',
+                '1502321894462980257',
+                '1503124531391365203',
+                '1507547514264485969'
             ],
             supportStaff: [
                 '1502329914224017710',
                 '1502321921113460827',
                 '1502321894462980257',
-                '1502321920652345484'  // Directeur
+                '1502321920652345484'
             ],
             supportArmee: [
                 '1502329914224017710',
                 '1502321921113460827',
                 '1502321920652345484',
-                '1502321913169707089', // Général d'armée
-                '1502321912314073251', // Général de corps d'armée
-                '1502321911433138387', // Général de division
-                '1502321910665580745', // Général de brigade
-                '1502321909596033156', // Colonel
-                '1502321908966887424', // Lieutenant-colonel
-                '1502321908182552647'  // Commandant
+                '1502321913169707089',
+                '1502321912314073251',
+                '1502321911433138387',
+                '1502321910665580745',
+                '1502321909596033156',
+                '1502321908966887424',
+                '1502321908182552647'
             ]
         }
     },
 
-    // Rôles disposant de l'ensemble des prérogatives.
     adminRoles: [
         '1502329914224017710',
         '1502321921113460827',
@@ -82,7 +57,6 @@ module.exports = {
         '1502321920652345484'
     ],
 
-    // Rôles habilités à certifier une spécialité.
     formationRoles: [
         '1502329914224017710',
         '1502321921113460827',
@@ -97,10 +71,9 @@ module.exports = {
         '1502321909596033156',
         '1502321908966887424',
         '1502321908182552647',
-        '1503144132628185251' // Formé instructeur
+        '1503144132628185251'
     ],
 
-    // Rôles habilités à prononcer une sanction.
     sanctionRoles: [
         '1502329914224017710',
         '1502321921113460827',
@@ -122,7 +95,6 @@ module.exports = {
         '1502321902020984842'
     ],
 
-    // Rôles habilités à rédiger un compte rendu de mission.
     rapportRoles: [
         '1502329914224017710',
         '1502321921113460827',
@@ -146,11 +118,6 @@ module.exports = {
         '1502321899751866550'
     ],
 
-    /**
-     * Hiérarchie militaire, du grade le plus élevé au plus modeste.
-     * La résolution s'effectue par identifiant de rôle afin de rester fiable
-     * même lorsque les positions sont réorganisées sur le serveur.
-     */
     grades: [
         { id: '1502329914224017710', nom: 'Fondation' },
         { id: '1502321921113460827', nom: 'Administrateur interne' },
@@ -180,7 +147,6 @@ module.exports = {
         { id: '1502472415127666780', nom: 'Engagé volontaire initial' }
     ],
 
-    // Spécialités certifiables : intitulé affiché et rôle attribué.
     specialites: {
         'Saut en parachute': '1503141271496032296',
         'Combat en zone close (CQB)': '1503141433295765625',
@@ -198,7 +164,7 @@ module.exports = {
         'Navigateur': '1503143524009246930',
         'Reconnaissance': '1503143690724708382',
         'Survie': '1503143785939599501',
-        'Gestion de prise d otage': '1503143881108357255',
+        'Gestion de prise d\'otage': '1503143881108357255',
         'Instructeur': '1503144132628185251',
         'Forces spéciales': '1503144232918188233',
         'Opérations nocturnes': '1503144389894213765',
