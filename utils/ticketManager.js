@@ -234,4 +234,95 @@ async function createTicketChannel(guild, member, type, category, subject, detai
             { name: '[CATEGORIE]', value: category === 'staff' ? 'Membre du Staff' : 'Membre de l\'Armee', inline: true },
             { name: '[URGENCCE]', value: urgency || 'Non precisee', inline: true },
             { name: '[SUJET]', value: subject, inline: false },
-            { name: '[DESCRIPTION]', value: details.length > 1024 ? details.substring(0, 1020) + '...' : details, inline: false
+            { name: '[DESCRIPTION]', value: details.length > 1024 ? details.substring(0, 1020) + '...' : details, inline: false }
+        )
+        .setFooter({ text: `Division Vanguard - Ticket ${number}` });
+
+    const closeRow = new ActionRowBuilder().addComponents(
+        new (require('discord.js').ButtonBuilder)()
+            .setCustomId(`ticket_close_${channel.id}`)
+            .setLabel('Fermer le ticket')
+            .setStyle(require('discord.js').ButtonStyle.Danger)
+    );
+
+    await channel.send({
+        content: `${member.toString()} ${category === 'staff' ? '<@&' + config.adminRoles[0] + '>' : '<@&' + config.formationRoles[0] + '>'} - Votre ticket a ete ouvert avec succes. Un membre concerne vous repondra sous peu.`,
+        embeds: [welcomeEmbed],
+        components: [closeRow]
+    });
+
+    // Log dans le salon logs-bot
+    const logEmbed = new EmbedBuilder()
+        .setTitle('[JOURNAL] Nouveau ticket cree')
+        .setColor(0x5865F2)
+        .setTimestamp()
+        .addFields(
+            { name: 'Numero', value: `#${number}`, inline: true },
+            { name: 'Type', value: isRdv ? 'Rendez-vous' : 'Support', inline: true },
+            { name: 'Categorie', value: category === 'staff' ? 'Staff' : 'Armee', inline: true },
+            { name: 'Auteur', value: `${member.user.username}\nID: \`${member.id}\``, inline: true },
+            { name: 'Salon', value: `<#${channel.id}>`, inline: true },
+            { name: 'Sujet', value: subject, inline: false }
+        );
+
+    const logsChannel = guild.channels.cache.get(config.channels.logsBot);
+    if (logsChannel) {
+        await logsChannel.send({ embeds: [logEmbed] }).catch(() => {});
+    }
+
+    return channel;
+}
+
+/**
+ * Ferme un ticket (supprime le salon)
+ */
+async function closeTicket(channel, closedBy) {
+    const data = loadData();
+    const ticket = data.active[channel.id];
+
+    if (ticket) {
+        // Envoyer un transcript avant suppression
+        const transcriptEmbed = new EmbedBuilder()
+            .setTitle(`[TICKET ${ticket.number}] Ferme`)
+            .setColor(0x95A5A6)
+            .setTimestamp()
+            .addFields(
+                { name: 'Type', value: ticket.type === 'rdv' ? 'Rendez-vous' : 'Support', inline: true },
+                { name: 'Categorie', value: ticket.category === 'staff' ? 'Staff' : 'Armee', inline: true },
+                { name: 'Auteur', value: ticket.authorTag, inline: true },
+                { name: 'Ferme par', value: closedBy.user.username, inline: true },
+                { name: 'Sujet', value: ticket.subject, inline: false },
+                { name: 'Description', value: ticket.details.length > 1024 ? ticket.details.substring(0, 1020) + '...' : ticket.details, inline: false }
+            );
+
+        // Log dans logs-bot
+        const logsChannel = channel.guild.channels.cache.get(config.channels.logsBot);
+        if (logsChannel) {
+            await logsChannel.send({ embeds: [transcriptEmbed] }).catch(() => {});
+        }
+
+        delete data.active[channel.id];
+        saveData(data);
+    }
+
+    await channel.send({ content: '[INFO] Ce ticket va etre ferme et le salon supprime dans 5 secondes.' }).catch(() => {});
+
+    setTimeout(async () => {
+        try {
+            await channel.delete('Ticket ferme');
+        } catch (e) {
+            console.error('[TICKET] Erreur suppression salon:', e);
+        }
+    }, 5000);
+}
+
+module.exports = {
+    generatePresentationEmbed,
+    generateOpenButton,
+    generateCategorySelect,
+    generateReasonModal,
+    createTicketChannel,
+    closeTicket,
+    loadData,
+    saveData
+};
