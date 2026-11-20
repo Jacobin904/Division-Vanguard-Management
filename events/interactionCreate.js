@@ -25,6 +25,7 @@ module.exports = {
 
     async execute(interaction) {
         try {
+            // Commandes applicatives
             if (interaction.isChatInputCommand()) {
                 const commande = interaction.client.commands.get(interaction.commandName);
                 if (!commande) return;
@@ -32,6 +33,7 @@ module.exports = {
                 return;
             }
 
+            // Autocomplétion
             if (interaction.isAutocomplete()) {
                 const commande = interaction.client.commands.get(interaction.commandName);
                 if (!commande?.autocomplete) return;
@@ -39,6 +41,7 @@ module.exports = {
                 return;
             }
 
+            // Boutons
             if (interaction.isButton()) {
                 const [domaine, module, action, parametre] = interaction.customId.split(':');
                 if (domaine !== 'dv' || module !== 'ticket') return;
@@ -55,19 +58,20 @@ module.exports = {
                     return interaction.showModal(tickets.construireFormulaire('rdv', 'general'));
                 }
 
-                if (action === 'prendre') return tickets.prendreEnCharge(interaction);
-                if (action === 'cloturer') return tickets.demanderCloture(interaction);
+                if (action === 'prendre') {
+                    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                    return tickets.prendreEnCharge(interaction);
+                }
 
-                if (action === 'cloture') {
-                    if (parametre === 'annuler') {
-                        return interaction.update({ content: 'Clôture annulée. Le dossier demeure ouvert.', components: [] });
-                    }
-                    if (parametre === 'confirmer') return tickets.cloturerTicket(interaction);
+                if (action === 'cloturer') {
+                    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                    return tickets.cloturerTicket(interaction);
                 }
 
                 return;
             }
 
+            // Menus déroulants
             if (interaction.isStringSelectMenu()) {
                 if (interaction.customId === 'dv:ticket:destinataire:support') {
                     return interaction.showModal(tickets.construireFormulaire('support', interaction.values[0]));
@@ -75,6 +79,7 @@ module.exports = {
                 return;
             }
 
+            // Fenêtres modales
             if (interaction.isModalSubmit()) {
                 if (interaction.customId === 'rapport_mission_modal') {
                     return handleRapportModal(interaction);
