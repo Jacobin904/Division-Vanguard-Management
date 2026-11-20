@@ -3,8 +3,7 @@
 const {
     SlashCommandBuilder,
     PermissionFlagsBits,
-    MessageFlags,
-    ChannelType
+    MessageFlags
 } = require('discord.js');
 
 const { estAdministrateur } = require('../utils/permissions');
@@ -27,8 +26,6 @@ module.exports = {
         .setDescription('Système de gestion des tickets')
         .setDefaultMemberPermissions(0)
         .setDMPermission(false)
-        
-        // Sous-commande : Publier une interface (admin seulement)
         .addSubcommand(sub =>
             sub.setName('publier')
                .setDescription('Publier une interface de ticket (administration uniquement)')
@@ -42,26 +39,18 @@ module.exports = {
                       )
                )
         )
-        
-        // Sous-commande : Fermer un ticket
         .addSubcommand(sub =>
             sub.setName('fermer')
                .setDescription('Fermer le ticket actuel et archiver la transcription')
         )
-        
-        // Sous-commande : Prendre en charge
         .addSubcommand(sub =>
             sub.setName('prendre')
                .setDescription('Prendre en charge le ticket actuel')
         )
-        
-        // Sous-commande : Relâcher la prise en charge
         .addSubcommand(sub =>
             sub.setName('relacher')
                .setDescription('Relâcher la prise en charge du ticket actuel')
         )
-        
-        // Sous-commande : Renommer le ticket
         .addSubcommand(sub =>
             sub.setName('renommer')
                .setDescription('Renommer le salon du ticket')
@@ -73,8 +62,6 @@ module.exports = {
                       .setMaxLength(50)
                )
         )
-        
-        // Sous-commande : Changer la priorité
         .addSubcommand(sub =>
             sub.setName('priorite')
                .setDescription('Changer le niveau de priorité du ticket')
@@ -90,8 +77,6 @@ module.exports = {
                       )
                )
         )
-        
-        // Sous-commande : Ajouter un membre
         .addSubcommand(sub =>
             sub.setName('ajouter')
                .setDescription('Ajouter un membre au ticket')
@@ -101,8 +86,6 @@ module.exports = {
                       .setRequired(true)
                )
         )
-        
-        // Sous-commande : Retirer un membre
         .addSubcommand(sub =>
             sub.setName('retirer')
                .setDescription('Retirer un membre du ticket')
@@ -112,14 +95,10 @@ module.exports = {
                       .setRequired(true)
                )
         )
-        
-        // Sous-commande : Afficher les infos
         .addSubcommand(sub =>
             sub.setName('info')
                .setDescription('Afficher les informations détaillées du ticket')
         )
-        
-        // Sous-commande : Transférer le ticket
         .addSubcommand(sub =>
             sub.setName('transferer')
                .setDescription('Transférer le ticket à un autre membre')
