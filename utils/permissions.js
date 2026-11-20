@@ -60,6 +60,7 @@ module.exports = {
     canSanction: peutSanctionner,
     canRapport: peutRapporter,
     getHighestGrade: gradeLePlusEleve,
+    gradeLePlusEleve: gradeLePlusEleve,
     getSpecialites: specialitesObtenues,
     hasRoleInList: possedeUnRole,
     estAdministrateur,
