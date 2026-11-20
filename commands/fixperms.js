@@ -3,7 +3,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 
 // ============================================================================
-// CONFIGURATION DES RÔLES CLÉS (Basée sur le rapport du serveur)
+// CONFIGURATION DES RÔLES (Basée sur ton rapport)
 // ============================================================================
 const ROLES = {
     ADMIN: [
@@ -45,77 +45,45 @@ const ROLES = {
     BOT: '1503484181735276605'    // Rôle BOT
 };
 
-// ============================================================================
-// MODÈLES DE PERMISSIONS
-// ============================================================================
-const MODELES = {
-    // Modèle pour les salons d'information en lecture seule (règles, faq, liens)
-    LECTURE_SEULE: (guild) => [
-        { id: guild.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads] },
-        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels] })),
-        ...ROLES.STAFF.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory] }))
-    ],
-
-    // Modèle pour les salons de communication générale
-    COMMUNICATION: (guild) => [
-        { id: guild.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.UseApplicationCommands] },
-        { id: ROLES.RECRUE, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ManageMessages, PermissionFlagsBits.MuteMembers, PermissionFlagsBits.DeafenMembers] }))
-    ],
-
-    // Modèle pour les salons d'administration interne (totalement privés)
-    ADMIN_INTERNE: (guild) => [
-        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ManageChannels] })),
-        { id: ROLES.BOT, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
-    ],
-
-    // Modèle pour les opérations militaires (réservé militaire du rang et plus)
-    OPERATIONS: (guild) => [
-        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        ...[...ROLES.MILITAIRE, ...ROLES.SOUS_OFFICIER, ...ROLES.OFFICIER, ...ROLES.ADMIN, ...ROLES.STAFF].map(id => ({ 
-            id, 
-            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] 
-        })),
-        ...ROLES.OFFICIER.map(id => ({ id, allow: [PermissionFlagsBits.ManageMessages] }))
-    ],
-
-    // Modèle pour la formation (académie ouverte aux recrues, résultats réservés au staff)
-    FORMATION: (guild) => [
-        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: ROLES.RECRUE, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
-        ...[...ROLES.MILITAIRE, ...ROLES.SOUS_OFFICIER, ...ROLES.OFFICIER, ...ROLES.ADMIN, ...ROLES.STAFF].map(id => ({ 
-            id, 
-            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] 
-        })),
-        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ManageChannels] }))
-    ],
-
-    // Modèle pour les salons vocaux généraux
-    VOCAL_GENERAL: (guild) => [
-        { id: guild.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
-        { id: ROLES.RECRUE, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
-        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.MuteMembers, PermissionFlagsBits.DeafenMembers, PermissionFlagsBits.MoveMembers] }))
-    ],
-
-    // Modèle pour les salons vocaux restreints (État-Major, Admin)
-    VOCAL_RESTREINT: (guild) => [
-        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] },
-        ...[...ROLES.OFFICIER, ...ROLES.ADMIN, ...ROLES.STAFF].map(id => ({ 
-            id, 
-            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MuteMembers, PermissionFlagsBits.DeafenMembers] 
-        }))
-    ]
-};
+const TOUS_LES_STAFF = [...ROLES.ADMIN, ...ROLES.STAFF, ...ROLES.OFFICIER, ...ROLES.SOUS_OFFICIER];
+const TOUTE_LA_HIERARCHIE = [...TOUS_LES_STAFF, ...ROLES.MILITAIRE];
 
 // ============================================================================
-// LOGIQUE DE LA COMMANDE
+// LOGIQUE DE DÉTECTION DES SALONS (ORDRE CRITIQUE : DU PLUS RESTRICTIF AU MOINS RESTRICTIF)
+// ============================================================================
+
+function estSalonStaffUniquement(nomCategorie, nomSalon) {
+    const categoriesStaff = ['administration interne', 'état major', 'etat major'];
+    const salonsSpecifiques = ['staff-general', 'gestion-membres', 'sanctions-internes', 'logs-bot', 'config-serveur', 'tickets-internes', 'conseil-officiers', 'moderator-only'];
+    
+    return categoriesStaff.some(c => nomCategorie.includes(c)) || salonsSpecifiques.some(s => nomSalon.includes(s));
+}
+
+function estSalonLectureSeule(nomCategorie, nomSalon) {
+    const salonsSpecifiques = ['règle', 'regle', 'annonce', 'faq', 'liens-utiles', 'presentation', 'partenariat'];
+    return salonsSpecifiques.some(s => nomSalon.includes(s));
+}
+
+function estSalonMilitaireRestreint(nomCategorie, nomSalon) {
+    const categoriesMilitaires = ['opérations militaires', 'operations militaires', 'unités spéciales', 'unites speciales'];
+    const salonsSpecifiques = ['ordres-operation', 'rapports-mission', 'debrief-apres-mission', 'sniper-elite', 'forces-speciales', 'pilotes-salon', 'briefing-aerien', 'intel-renseignement'];
+    
+    return categoriesMilitaires.some(c => nomCategorie.includes(c)) || salonsSpecifiques.some(s => nomSalon.includes(s));
+}
+
+function estSalonFormation(nomCategorie, nomSalon) {
+    const categories = ['formation et entraînement', 'formation et entrainement', 'aide recrues'];
+    return categories.some(c => nomCategorie.includes(c));
+}
+
+// ============================================================================
+// COMMANDE
 // ============================================================================
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('fixperms')
-        .setDescription('Réinitialise les permissions des salons et rôles selon le protocole (Admin uniquement)')
+        .setDescription('Réinitialise intégralement les permissions selon le protocole de sécurité (Admin uniquement)')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .setDMPermission(false),
 
@@ -124,6 +92,7 @@ module.exports = {
             return interaction.reply({ content: '[ERREUR] Vous devez posséder la permission Administrateur pour exécuter cette opération.' });
         }
 
+        // Message PUBLIC comme demandé
         await interaction.reply({ content: '[EN COURS] Début de la réinitialisation des permissions. Cette opération peut prendre une minute. Veuillez patienter...' });
 
         const guild = interaction.guild;
@@ -136,71 +105,87 @@ module.exports = {
         let salonsTraités = 0;
         let erreurs = 0;
 
-        const channels = guild.channels.cache.filter(c => c.type !== ChannelType.GuildCategory);
+        // On exclut les catégories de la boucle principale pour ne modifier que les salons
+        const salons = guild.channels.cache.filter(c => c.type !== ChannelType.GuildCategory);
 
-        for (const salon of channels.values()) {
+        for (const salon of salons.values()) {
             try {
                 let nouvellesPermissions = [];
                 const nomCategorie = salon.parentId ? (guild.channels.cache.get(salon.parentId)?.name || '').toLowerCase() : '';
                 const nomSalon = salon.name.toLowerCase();
 
-                // 1. DÉTECTION DU MODÈLE DE BASE SELON LA CATÉGORIE
-                if (nomCategorie.includes('information rp')) {
-                    nouvellesPermissions = MODELES.LECTURE_SEULE(guild);
-                } else if (nomCategorie.includes('communication generale')) {
-                    nouvellesPermissions = MODELES.COMMUNICATION(guild);
-                } else if (nomCategorie.includes('administration interne')) {
-                    nouvellesPermissions = MODELES.ADMIN_INTERNE(guild);
-                } else if (nomCategorie.includes('opérations militaires') || nomCategorie.includes('unités spéciales')) {
-                    nouvellesPermissions = MODELES.OPERATIONS(guild);
-                } else if (nomCategorie.includes('formation et entraînement')) {
-                    nouvellesPermissions = MODELES.FORMATION(guild);
-                } else if (nomCategorie.includes('état major')) {
-                    nouvellesPermissions = MODELES.OPERATIONS(guild);
-                } else if (salon.type === ChannelType.GuildVoice) {
-                    if (nomCategorie.includes('salons vocaux') && (nomSalon.includes('général') || nomSalon.includes('afk') || nomSalon.includes('formation'))) {
-                        nouvellesPermissions = MODELES.VOCAL_GENERAL(guild);
-                    } else {
-                        nouvellesPermissions = MODELES.VOCAL_RESTREINT(guild);
-                    }
-                } else {
-                    nouvellesPermissions = MODELES.COMMUNICATION(guild);
-                }
-
-                // 2. EXCEPTIONS SPÉCIFIQUES PAR SALON (Surcharge du modèle de base)
-                if (nomSalon.includes('règle') || nomSalon.includes('regle')) {
-                    const everyoneRule = nouvellesPermissions.find(p => p.id === guild.id);
-                    if (everyoneRule) everyoneRule.allow.push(PermissionFlagsBits.AddReactions);
+                // 1. SALONS STRICTEMENT RÉSERVÉS AU STAFF (Invisibles pour le public)
+                if (estSalonStaffUniquement(nomCategorie, nomSalon)) {
+                    nouvellesPermissions = [
+                        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+                        ...TOUS_LES_STAFF.map(id => ({ 
+                            id, 
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ManageChannels] 
+                        })),
+                        { id: ROLES.BOT, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
+                    ];
                 } 
-                else if (nomSalon.includes('annonce')) {
+                // 2. SALONS EN LECTURE SEULE POUR LE PUBLIC (Règles, Annonces, etc.)
+                else if (estSalonLectureSeule(nomCategorie, nomSalon)) {
                     nouvellesPermissions = [
                         { id: guild.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads] },
-                        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory] })),
+                        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels] })),
                         ...ROLES.STAFF.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory] }))
                     ];
                 }
-                else if (nomSalon.includes('log') || nomSalon.includes('config') || nomSalon.includes('sanction-interne')) {
-                    nouvellesPermissions = MODELES.ADMIN_INTERNE(guild);
-                }
-                else if (nomSalon.includes('resultat') || nomSalon.includes('registre-promotion')) {
+                // 3. SALONS MILITAIRES RESTREINTS (Invisibles pour les recrues/civils)
+                else if (estSalonMilitaireRestreint(nomCategorie, nomSalon)) {
                     nouvellesPermissions = [
-                        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                        ...[...ROLES.ADMIN, ...ROLES.STAFF, ...ROLES.OFFICIER].map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages] }))
+                        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+                        ...TOUTE_LA_HIERARCHIE.map(id => ({ 
+                            id, 
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] 
+                        })),
+                        ...ROLES.OFFICIER.map(id => ({ id, allow: [PermissionFlagsBits.ManageMessages] }))
                     ];
                 }
-                else if (nomSalon.includes('bot-commande')) {
-                    const everyoneCmd = nouvellesPermissions.find(p => p.id === guild.id);
-                    if (everyoneCmd && !everyoneCmd.allow.includes(PermissionFlagsBits.UseApplicationCommands)) {
-                        everyoneCmd.allow.push(PermissionFlagsBits.UseApplicationCommands);
+                // 4. SALONS DE FORMATION (Visibles par les recrues en lecture, écriture pour le staff)
+                else if (estSalonFormation(nomCategorie, nomSalon)) {
+                    nouvellesPermissions = [
+                        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }, // On refuse tout le monde par défaut
+                        { id: ROLES.RECRUE, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] }, // Les recrues peuvent seulement lire
+                        ...TOUTE_LA_HIERARCHIE.map(id => ({ 
+                            id, 
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] 
+                        })),
+                        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ManageChannels] }))
+                    ];
+                }
+                // 5. SALONS VOCAUX
+                else if (salon.type === ChannelType.GuildVoice) {
+                    if (nomCategorie.includes('administration') || nomSalon.includes('administration') || nomSalon.includes('etat major')) {
+                        // Vocal Staff
+                        nouvellesPermissions = [
+                            { id: guild.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] },
+                            ...TOUS_LES_STAFF.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MuteMembers] }))
+                        ];
+                    } else {
+                        // Vocal Public
+                        nouvellesPermissions = [
+                            { id: guild.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
+                            ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.MuteMembers, PermissionFlagsBits.DeafenMembers, PermissionFlagsBits.MoveMembers] }))
+                        ];
                     }
                 }
+                // 6. DÉFAUT : COMMUNICATION GÉNÉRALE (Pour tout le reste)
+                else {
+                    nouvellesPermissions = [
+                        { id: guild.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.UseApplicationCommands] },
+                        ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ManageMessages, PermissionFlagsBits.MuteMembers, PermissionFlagsBits.DeafenMembers] }))
+                    ];
+                }
 
-                // 3. APPLICATION DES PERMISSIONS
+                // APPLICATION DES PERMISSIONS
                 await salon.permissionOverwrites.set(nouvellesPermissions, `Réinitialisation protocolaire par la commande /fixperms`);
                 salonsTraités++;
                 
-                // Petite pause pour éviter les limites de taux (Rate Limits) de l'API Discord
-                await new Promise(resolve => setTimeout(resolve, 200));
+                // Pause anti-rate limit
+                await new Promise(resolve => setTimeout(resolve, 150));
 
             } catch (erreur) {
                 console.error(`[FIXPERMS] Erreur sur le salon ${salon.name} (${salon.id}) :`, erreur.message);
@@ -208,14 +193,14 @@ module.exports = {
             }
         }
 
-        // 4. MESSAGE DE FIN
+        // MESSAGE DE FIN PUBLIC
         if (erreurs > 0) {
             await interaction.editReply({ 
                 content: `[TERMINÉ AVEC AVERTISSEMENT] Réinitialisation terminée. ${salonsTraités} salons traités avec succès, mais ${erreurs} erreur(s) ont été rencontrées.\n\nVérifiez que le rôle du bot est situé **au-dessus** de tous les rôles qu'il est censé modifier dans la hiérarchie du serveur.` 
             });
         } else {
             await interaction.editReply({ 
-                content: `[SUCCÈS] Réinitialisation terminée avec succès. ${salonsTraités} salons ont été configurés selon le protocole de sécurité Division Vanguard.\n\nTous les salons d'annonces, d'administration et opérationnels sont désormais sécurisés.` 
+                content: `[SUCCÈS] Réinitialisation terminée avec succès. ${salonsTraités} salons ont été configurés.\n\nLes salons de règles sont désormais en lecture seule, et les salons de staff sont totalement invisibles pour les membres non autorisés.` 
             });
         }
     }
