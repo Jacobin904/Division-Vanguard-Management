@@ -2,63 +2,9 @@
 
 const { EmbedBuilder, AttachmentBuilder, PermissionFlagsBits } = require('discord.js');
 
-// Traduction française des permissions Discord
-const TRADUCTION_PERMISSIONS = {
-    CreateInstantInvite: 'Créer une invitation',
-    KickMembers: 'Expulser des membres',
-    BanMembers: 'Bannir des membres',
-    Administrator: 'Administrateur',
-    ManageChannels: 'Gérer les salons',
-    ManageGuild: 'Gérer le serveur',
-    AddReactions: 'Ajouter des réactions',
-    ViewAuditLog: 'Consulter les logs du serveur',
-    PrioritySpeaker: 'Voix prioritaire',
-    Stream: 'Vidéo',
-    ViewChannel: 'Voir les salons',
-    SendMessages: 'Envoyer des messages',
-    SendTTSMessages: 'Envoyer des messages TTS',
-    ManageMessages: 'Gérer les messages',
-    EmbedLinks: 'Intégrer des liens',
-    AttachFiles: 'Joindre des fichiers',
-    ReadMessageHistory: 'Lire l\'historique des messages',
-    MentionEveryone: 'Mentionner @everyone',
-    UseExternalEmojis: 'Utiliser des émojis externes',
-    ViewGuildInsights: 'Consulter les statistiques du serveur',
-    Connect: 'Se connecter',
-    Speak: 'Parler',
-    MuteMembers: 'Rendre muet des membres',
-    DeafenMembers: 'Mettre en sourdine des membres',
-    MoveMembers: 'Déplacer des membres',
-    UseVAD: 'Utiliser la détection de voix',
-    ChangeNickname: 'Changer de pseudo',
-    ManageNicknames: 'Gérer les pseudos',
-    ManageRoles: 'Gérer les rôles',
-    ManageWebhooks: 'Gérer les webhooks',
-    ManageEmojisAndStickers: 'Gérer les émojis et stickers',
-    ManageGuildExpressions: 'Gérer les expressions',
-    UseApplicationCommands: 'Utiliser les commandes d\'application',
-    RequestToSpeak: 'Demander la parole',
-    ManageEvents: 'Gérer les événements',
-    ManageThreads: 'Gérer les fils',
-    CreatePublicThreads: 'Créer des fils publics',
-    CreatePrivateThreads: 'Créer des fils privés',
-    UseExternalStickers: 'Utiliser des stickers externes',
-    SendMessagesInThreads: 'Envoyer des messages dans les fils',
-    UseEmbeddedActivities: 'Utiliser les activités intégrées',
-    ModerateMembers: 'Modérer les membres',
-    ViewCreatorMonetizationAnalytics: 'Voir les statistiques de monétisation',
-    UseSoundboard: 'Utiliser le soundboard',
-    CreateGuildExpressions: 'Créer des expressions',
-    CreateEvents: 'Créer des événements',
-    UseExternalSounds: 'Utiliser des sons externes',
-    SendVoiceMessages: 'Envoyer des messages vocaux',
-    SendPolls: 'Envoyer des sondages',
-    UseExternalApps: 'Utiliser des applications externes'
-};
-
-const TRADUCTION_NIVEAU_VERIFICATION = {
+const TRADUCTION_NIVEAU_VÉRIFICATION = {
     0: 'Aucun',
-    1: 'Faible (email vérifié)',
+    1: 'Faible (e-mail vérifié)',
     2: 'Moyen (inscrit depuis 5 min)',
     3: 'Élevé (membre depuis 10 min)',
     4: 'Très élevé (numéro de téléphone vérifié)'
@@ -91,9 +37,50 @@ const TRADUCTION_TYPE_SALON = {
     16: 'Média'
 };
 
-/**
- * Décode un bitfield de permissions en liste de noms lisibles
- */
+const TRADUCTION_PERMISSIONS = {
+    CreateInstantInvite: 'Créer une invitation',
+    KickMembers: 'Expulser des membres',
+    BanMembers: 'Bannir des membres',
+    Administrator: 'Administrateur',
+    ManageChannels: 'Gérer les salons',
+    ManageGuild: 'Gérer le serveur',
+    AddReactions: 'Ajouter des réactions',
+    ViewAuditLog: 'Consulter les journaux d\'audit',
+    PrioritySpeaker: 'Voix prioritaire',
+    Stream: 'Vidéo',
+    ViewChannel: 'Voir les salons',
+    SendMessages: 'Envoyer des messages',
+    SendTTSMessages: 'Envoyer des messages TTS',
+    ManageMessages: 'Gérer les messages',
+    EmbedLinks: 'Intégrer des liens',
+    AttachFiles: 'Joindre des fichiers',
+    ReadMessageHistory: 'Lire l\'historique des messages',
+    MentionEveryone: 'Mentionner @everyone',
+    UseExternalEmojis: 'Utiliser des émojis externes',
+    ViewGuildInsights: 'Consulter les statistiques du serveur',
+    Connect: 'Se connecter',
+    Speak: 'Parler',
+    MuteMembers: 'Rendre muet des membres',
+    DeafenMembers: 'Mettre en sourdine des membres',
+    MoveMembers: 'Déplacer des membres',
+    UseVAD: 'Utiliser la détection de voix',
+    ChangeNickname: 'Changer de pseudo',
+    ManageNicknames: 'Gérer les pseudos',
+    ManageRoles: 'Gérer les rôles',
+    ManageWebhooks: 'Gérer les webhooks',
+    ManageEmojisAndStickers: 'Gérer les émojis et autocollants',
+    UseApplicationCommands: 'Utiliser les commandes d\'application',
+    RequestToSpeak: 'Demander la parole',
+    ManageEvents: 'Gérer les événements',
+    ManageThreads: 'Gérer les fils',
+    CreatePublicThreads: 'Créer des fils publics',
+    CreatePrivateThreads: 'Créer des fils privés',
+    UseExternalStickers: 'Utiliser des autocollants externes',
+    SendMessagesInThreads: 'Envoyer des messages dans les fils',
+    UseEmbeddedActivities: 'Utiliser les activités intégrées',
+    ModerateMembers: 'Modérer les membres'
+};
+
 function decoderPermissions(bitfield) {
     if (!bitfield || bitfield === 0n) return ['Aucune'];
     const permissions = [];
@@ -105,57 +92,47 @@ function decoderPermissions(bitfield) {
     return permissions.length > 0 ? permissions : ['Aucune'];
 }
 
-/**
- * Génère le rapport texte complet avec TOUTES les informations
- */
 function genererRapportComplet(guild) {
     const date = new Date();
     const lignes = [];
 
     const ajouter = (texte) => lignes.push(texte);
     const separateur = () => ajouter('================================================================');
-    const sousSeparateur = () => ajouter('----------------------------------------------------------------');
 
-    // =========================================================================
-    // EN-TÊTE
-    // =========================================================================
     separateur();
     ajouter('        RAPPORT COMPLET DU SERVEUR');
     ajouter('           DIVISION VANGUARD');
-    ajouter('================================================================');
+    separateur();
     ajouter('');
 
-    // =========================================================================
-    // INFORMATIONS GÉNÉRALES
-    // =========================================================================
-    ajouter('--- INFORMATIONS GENERALES ---');
+    ajouter('--- INFORMATIONS GÉNÉRALES ---');
     ajouter(`Nom du serveur        : ${guild.name}`);
     ajouter(`ID du serveur         : ${guild.id}`);
-    ajouter(`Proprietaire          : ${guild.members.cache.get(guild.ownerId)?.user.username || 'Inconnu'}`);
-    ajouter(`ID du proprietaire    : ${guild.ownerId}`);
-    ajouter(`Date de creation      : ${guild.createdAt.toUTCString()}`);
+    ajouter(`Propriétaire          : ${guild.members.cache.get(guild.ownerId)?.user.username || 'Inconnu'}`);
+    ajouter(`ID du propriétaire    : ${guild.ownerId}`);
+    ajouter(`Date de création      : ${guild.createdAt.toUTCString()}`);
     ajouter(`Description           : ${guild.description || 'Aucune'}`);
-    ajouter(`Niveau de verification: ${TRADUCTION_NIVEAU_VERIFICATION[guild.verificationLevel] || guild.verificationLevel}`);
+    ajouter(`Niveau de vérification: ${TRADUCTION_NIVEAU_VÉRIFICATION[guild.verificationLevel] || guild.verificationLevel}`);
     ajouter(`Niveau de boost       : ${TRADUCTION_NIVEAU_BOOST[guild.premiumTier] || guild.premiumTier}`);
     ajouter(`Nombre de boosts      : ${guild.premiumSubscriptionCount || 0}`);
     ajouter(`Membres (total)       : ${guild.memberCount}`);
     ajouter(`Membres (humains)     : ${guild.members.cache.filter(m => !m.user.bot).size}`);
     ajouter(`Membres (bots)        : ${guild.members.cache.filter(m => m.user.bot).size}`);
-    ajouter(`Roles                 : ${guild.roles.cache.size}`);
+    ajouter(`Rôles                 : ${guild.roles.cache.size}`);
     ajouter(`Salons (total)        : ${guild.channels.cache.size}`);
-    ajouter(`Emojis (statiques)    : ${guild.emojis.cache.filter(e => !e.animated).size}`);
-    ajouter(`Emojis (animes)       : ${guild.emojis.cache.filter(e => e.animated).size}`);
-    ajouter(`Stickers              : ${guild.stickers.cache.size}`);
-    ajouter(`URL personnalisee     : ${guild.vanityURLCode ? `discord.gg/${guild.vanityURLCode}` : 'Aucune'}`);
-    ajouter(`Langue preferee       : ${guild.preferredLocale || 'Non definie'}`);
-    ajouter(`AFK salon             : ${guild.afkChannelId ? guild.channels.cache.get(guild.afkChannelId)?.name || 'Inconnu' : 'Aucun'}`);
-    ajouter(`AFK delai             : ${guild.afkTimeout || 0} secondes`);
+    ajouter(`Émojis (statiques)    : ${guild.emojis.cache.filter(e => !e.animated).size}`);
+    ajouter(`Émojis (animés)       : ${guild.emojis.cache.filter(e => e.animated).size}`);
+    ajouter(`Autocollants          : ${guild.stickers.cache.size}`);
+    ajouter(`URL personnalisée     : ${guild.vanityURLCode ? `discord.gg/${guild.vanityURLCode}` : 'Aucune'}`);
+    ajouter(`Langue préférée       : ${guild.preferredLocale || 'Non définie'}`);
+    ajouter(`Salon AFK             : ${guild.afkChannelId ? guild.channels.cache.get(guild.afkChannelId)?.name || 'Inconnu' : 'Aucun'}`);
+    ajouter(`Délai AFK             : ${guild.afkTimeout || 0} secondes`);
     ajouter(`NSFW                  : ${guild.nsfw ? 'Oui' : 'Non'}`);
     ajouter(`Filtrage contenu      : ${TRADUCTION_FILTRAGE_CONTENU[guild.explicitContentFilter] || guild.explicitContentFilter}`);
     ajouter(`MFA requis            : ${guild.mfaLevel === 1 ? 'Oui' : 'Non'}`);
-    ajouter(`Boost progress bar    : ${guild.premiumProgressBarEnabled ? 'Activee' : 'Desactivee'}`);
+    ajouter(`Barre de progression  : ${guild.premiumProgressBarEnabled ? 'Activée' : 'Désactivée'}`);
     ajouter('');
-    ajouter('Fonctionnalites actives :');
+    ajouter('Fonctionnalités actives :');
     if (guild.features.length > 0) {
         guild.features.forEach(f => ajouter(`  - ${f}`));
     } else {
@@ -163,19 +140,13 @@ function genererRapportComplet(guild) {
     }
     ajouter('');
 
-    // =========================================================================
-    // LIENS ET IMAGES
-    // =========================================================================
     ajouter('--- LIENS ET IMAGES ---');
-    ajouter(`Icone                 : ${guild.iconURL({ size: 2048, dynamic: true }) || 'Aucune'}`);
-    ajouter(`Banniere              : ${guild.bannerURL({ size: 2048 }) || 'Aucune'}`);
+    ajouter(`Icône                 : ${guild.iconURL({ size: 2048, dynamic: true }) || 'Aucune'}`);
+    ajouter(`Bannière              : ${guild.bannerURL({ size: 2048 }) || 'Aucune'}`);
     ajouter(`Splash                : ${guild.splashURL({ size: 2048 }) || 'Aucun'}`);
-    ajouter(`Discovery Splash      : ${guild.discoverySplashURL({ size: 2048 }) || 'Aucun'}`);
+    ajouter(`Splash de découverte  : ${guild.discoverySplashURL({ size: 2048 }) || 'Aucun'}`);
     ajouter('');
 
-    // =========================================================================
-    // SALONS (avec permissions)
-    // =========================================================================
     ajouter('================================================================');
     ajouter(`--- SALONS (${guild.channels.cache.size} au total) ---`);
     ajouter('================================================================');
@@ -192,23 +163,22 @@ function genererRapportComplet(guild) {
         ajouter(`[${type}] ${salon.name}`);
         ajouter(`  ID            : ${salon.id}`);
         ajouter(`  Position      : ${salon.position}`);
-        ajouter(`  Categorie     : ${categorie}`);
+        ajouter(`  Catégorie     : ${categorie}`);
         ajouter(`  NSFW          : ${salon.nsfw ? 'Oui' : 'Non'}`);
         if (salon.topic) ajouter(`  Sujet         : ${salon.topic}`);
-        if (salon.rateLimitPerUser) ajouter(`  Slowmode      : ${salon.rateLimitPerUser} secondes`);
-        if (salon.bitrate) ajouter(`  Bitrate       : ${salon.bitrate / 1000} kbps`);
+        if (salon.rateLimitPerUser) ajouter(`  Mode lent     : ${salon.rateLimitPerUser} secondes`);
+        if (salon.bitrate) ajouter(`  Débit           : ${salon.bitrate / 1000} kbps`);
         if (salon.userLimit) ajouter(`  Limite util.  : ${salon.userLimit}`);
-        if (salon.createdAt) ajouter(`  Cree le       : ${salon.createdAt.toUTCString()}`);
+        if (salon.createdAt) ajouter(`  Créé le       : ${salon.createdAt.toUTCString()}`);
 
-        // Permissions du salon
         if (salon.permissionOverwrites && salon.permissionOverwrites.cache.size > 0) {
-            ajouter('  Permissions specifiques :');
+            ajouter('  Permissions spécifiques :');
             salon.permissionOverwrites.cache.forEach(overwrite => {
                 let nom;
-                if (overwrite.type === 0) { // Role
+                if (overwrite.type === 0) {
                     const role = guild.roles.cache.get(overwrite.id);
-                    nom = role ? `[Role] ${role.name}` : `[Role] ID ${overwrite.id}`;
-                } else if (overwrite.type === 1) { // Membre
+                    nom = role ? `[Rôle] ${role.name}` : `[Rôle] ID ${overwrite.id}`;
+                } else if (overwrite.type === 1) {
                     const membre = guild.members.cache.get(overwrite.id);
                     nom = membre ? `[Membre] ${membre.user.username}` : `[Membre] ID ${overwrite.id}`;
                 } else {
@@ -218,25 +188,22 @@ function genererRapportComplet(guild) {
                 const allow = decoderPermissions(overwrite.allow.bitfield);
                 const deny = decoderPermissions(overwrite.deny.bitfield);
                 if (allow[0] !== 'Aucune') {
-                    ajouter(`      Autorisees :`);
+                    ajouter(`      Autorisées :`);
                     allow.forEach(p => ajouter(`        + ${p}`));
                 }
                 if (deny[0] !== 'Aucune') {
-                    ajouter(`      Refusees   :`);
+                    ajouter(`      Refusées   :`);
                     deny.forEach(p => ajouter(`        - ${p}`));
                 }
             });
         } else {
-            ajouter('  Permissions specifiques : Aucune (permissions par defaut)');
+            ajouter('  Permissions spécifiques : Aucune (permissions par défaut)');
         }
         ajouter('');
     });
 
-    // =========================================================================
-    // ROLES (avec permissions)
-    // =========================================================================
     ajouter('================================================================');
-    ajouter(`--- ROLES (${guild.roles.cache.size} au total) ---`);
+    ajouter(`--- RÔLES (${guild.roles.cache.size} au total) ---`);
     ajouter('================================================================');
     ajouter('');
 
@@ -245,21 +212,18 @@ function genererRapportComplet(guild) {
         ajouter(`[Position ${String(role.position).padStart(2)}] ${role.name}`);
         ajouter(`  ID            : ${role.id}`);
         ajouter(`  Couleur       : ${role.hexColor}`);
-        ajouter(`  Affiche separe: ${role.hoist ? 'Oui' : 'Non'}`);
+        ajouter(`  Affiché séparé: ${role.hoist ? 'Oui' : 'Non'}`);
         ajouter(`  Mentionnable  : ${role.mentionable ? 'Oui' : 'Non'}`);
-        ajouter(`  Gere par bot  : ${role.managed ? 'Oui' : 'Non'}`);
-        ajouter(`  Role premium  : ${role.tags?.premiumSubscriberRole ? 'Oui (Boost)' : 'Non'}`);
-        ajouter(`  Role bot      : ${role.tags?.botId ? `Oui (bot ID: ${role.tags.botId})` : 'Non'}`);
-        ajouter(`  Cree le       : ${role.createdAt.toUTCString()}`);
+        ajouter(`  Géré par bot  : ${role.managed ? 'Oui' : 'Non'}`);
+        ajouter(`  Rôle premium  : ${role.tags?.premiumSubscriberRole ? 'Oui (Boost)' : 'Non'}`);
+        ajouter(`  Rôle bot      : ${role.tags?.botId ? `Oui (bot ID: ${role.tags.botId})` : 'Non'}`);
+        ajouter(`  Créé le       : ${role.createdAt.toUTCString()}`);
         ajouter('  Permissions   :');
         const permissions = decoderPermissions(role.permissions.bitfield);
         permissions.forEach(p => ajouter(`    - ${p}`));
         ajouter('');
     });
 
-    // =========================================================================
-    // MEMBRES
-    // =========================================================================
     ajouter('================================================================');
     ajouter(`--- MEMBRES (${guild.memberCount} au total) ---`);
     ajouter('================================================================');
@@ -284,34 +248,31 @@ function genererRapportComplet(guild) {
         ajouter(`  Bot           : ${membre.user.bot ? 'Oui' : 'Non'}`);
         ajouter(`  Statut        : ${membre.presence?.status || 'Hors ligne'}`);
         ajouter(`  Surnom        : ${membre.nickname || 'Aucun'}`);
-        ajouter(`  Compte cree   : ${membre.user.createdAt.toUTCString()}`);
+        ajouter(`  Compte créé   : ${membre.user.createdAt.toUTCString()}`);
         ajouter(`  A rejoint     : ${membre.joinedAt.toUTCString()}`);
-        ajouter(`  Roles         : ${rolesList}`);
-        ajouter(`  Role le + haut: ${membre.roles.highest?.name || 'Aucun'} (pos ${membre.roles.highest?.position || 0})`);
+        ajouter(`  Rôles         : ${rolesList}`);
+        ajouter(`  Rôle le + haut: ${membre.roles.highest?.name || 'Aucun'} (pos ${membre.roles.highest?.position || 0})`);
         ajouter(`  Couleur       : ${membre.displayHexColor}`);
         ajouter('');
     });
 
-    // =========================================================================
-    // EMOJIS ET STICKERS
-    // =========================================================================
     ajouter('================================================================');
-    ajouter('--- EMOJIS ET STICKERS ---');
+    ajouter('--- ÉMOJIS ET AUTOCOLLANTS ---');
     ajouter('================================================================');
     ajouter('');
 
-    ajouter(`Emojis (${guild.emojis.cache.size}) :`);
+    ajouter(`Émojis (${guild.emojis.cache.size}) :`);
     guild.emojis.cache.forEach(emoji => {
         ajouter(`  Nom       : ${emoji.name}`);
         ajouter(`  ID        : ${emoji.id}`);
-        ajouter(`  Anime     : ${emoji.animated ? 'Oui' : 'Non'}`);
+        ajouter(`  Animé     : ${emoji.animated ? 'Oui' : 'Non'}`);
         ajouter(`  Disponible: ${emoji.available ? 'Oui' : 'Non'}`);
         ajouter(`  URL       : ${emoji.imageURL()}`);
-        if (emoji.author) ajouter(`  Cree par  : ${emoji.author.username} (${emoji.author.id})`);
+        if (emoji.author) ajouter(`  Créé par  : ${emoji.author.username} (${emoji.author.id})`);
         ajouter('');
     });
 
-    ajouter(`Stickers (${guild.stickers.cache.size}) :`);
+    ajouter(`Autocollants (${guild.stickers.cache.size}) :`);
     guild.stickers.cache.forEach(sticker => {
         ajouter(`  Nom       : ${sticker.name}`);
         ajouter(`  ID        : ${sticker.id}`);
@@ -320,27 +281,18 @@ function genererRapportComplet(guild) {
         ajouter('');
     });
 
-    // =========================================================================
-    // PIED DE PAGE
-    // =========================================================================
     separateur();
-    ajouter(`Rapport genere le ${date.toUTCString()}`);
-    ajouter(`Duree de generation : quelques secondes`);
+    ajouter(`Rapport généré le ${date.toUTCString()}`);
+    ajouter(`Durée de génération : quelques secondes`);
     separateur();
 
     return lignes.join('\n');
 }
 
-/**
- * Construit l'embed de résumé (max 25 fields)
- */
 function construireEmbedResume(guild) {
     const date = new Date();
-
     const membres = guild.members.cache;
     const salons = guild.channels.cache;
-    const roles = guild.roles.cache;
-    const emojis = guild.emojis.cache;
 
     const totalSalons = guild.channels.cache.size;
     const salonsTexte = salons.filter(c => c.type === 0).size;
@@ -361,17 +313,17 @@ function construireEmbedResume(guild) {
     }, new Set()).size;
 
     const liens = [];
-    if (guild.iconURL()) liens.push(`Icone: ${guild.iconURL({ size: 2048 })}`);
-    if (guild.bannerURL()) liens.push(`Banniere: ${guild.bannerURL({ size: 2048 })}`);
+    if (guild.iconURL()) liens.push(`Icône: ${guild.iconURL({ size: 2048 })}`);
+    if (guild.bannerURL()) liens.push(`Bannière: ${guild.bannerURL({ size: 2048 })}`);
     if (guild.splashURL()) liens.push(`Splash: ${guild.splashURL({ size: 2048 })}`);
     if (guild.vanityURLCode) liens.push(`Vanity: discord.gg/${guild.vanityURLCode}`);
 
-    const embed = new EmbedBuilder()
+    return new EmbedBuilder()
         .setAuthor({
-            name: `Division Vanguard — Inventaire complet`,
+            name: 'Division Vanguard — Inventaire complet',
             iconURL: guild.iconURL({ size: 128 }) || undefined
         })
-        .setTitle('[INVENTAIRE] Rapport synthetique du serveur')
+        .setTitle('[INVENTAIRE] Rapport synthétique du serveur')
         .setColor(0x2B3A55)
         .setThumbnail(guild.iconURL({ size: 256, dynamic: true }) || null)
         .setImage(guild.bannerURL({ size: 1024 }) || null)
@@ -379,7 +331,7 @@ function construireEmbedResume(guild) {
         .addFields(
             {
                 name: 'IDENTIFICATION',
-                value: `**Nom :** ${guild.name}\n**ID :** \`${guild.id}\`\n**Proprietaire :** <@${guild.ownerId}>\n**ID proprietaire :** \`${guild.ownerId}\`\n**Creation :** <t:${Math.floor(guild.createdTimestamp / 1000)}:d>`,
+                value: `**Nom :** ${guild.name}\n**ID :** \`${guild.id}\`\n**Propriétaire :** <@${guild.ownerId}>\n**ID propriétaire :** \`${guild.ownerId}\`\n**Création :** <t:${Math.floor(guild.createdTimestamp / 1000)}:d>`,
                 inline: false
             },
             {
@@ -398,32 +350,32 @@ function construireEmbedResume(guild) {
                 inline: true
             },
             {
-                name: 'SECURITE',
-                value: `**Verification :** \`${TRADUCTION_NIVEAU_VERIFICATION[guild.verificationLevel]}\`\n**MFA :** \`${guild.mfaLevel === 1 ? 'Active' : 'Inactif'}\``,
+                name: 'SÉCURITÉ',
+                value: `**Vérification :** \`${TRADUCTION_NIVEAU_VÉRIFICATION[guild.verificationLevel]}\`\n**MFA :** \`${guild.mfaLevel === 1 ? 'Activé' : 'Inactif'}\``,
                 inline: true
             },
             {
                 name: 'SALONS',
-                value: `**Total :** \`${totalSalons}\`\n**Texte :** \`${salonsTexte}\` | **Vocaux :** \`${salonsVocaux}\`\n**Categories :** \`${categories}\` | **Annonces :** \`${annonces}\`\n**Forums :** \`${forums}\` | **Scenes :** \`${scenes}\` | **Fils :** \`${fils}\``,
+                value: `**Total :** \`${totalSalons}\`\n**Texte :** \`${salonsTexte}\` | **Vocaux :** \`${salonsVocaux}\`\n**Catégories :** \`${categories}\` | **Annonces :** \`${annonces}\`\n**Forums :** \`${forums}\` | **Scènes :** \`${scenes}\` | **Fils :** \`${fils}\``,
                 inline: false
             },
             {
-                name: 'ROLES',
-                value: `**Total :** \`${roles.size}\`\n**Avec permissions specifiques :** \`${rolesAvecPermsSpecifiques}\``,
+                name: 'RÔLES',
+                value: `**Total :** \`${guild.roles.cache.size}\`\n**Avec permissions spécifiques :** \`${rolesAvecPermsSpecifiques}\``,
                 inline: true
             },
             {
-                name: 'EMOJIS ET STICKERS',
-                value: `**Statiques :** \`${emojis.filter(e => !e.animated).size}\`\n**Animes :** \`${emojis.filter(e => e.animated).size}\`\n**Stickers :** \`${guild.stickers.cache.size}\``,
+                name: 'ÉMOJIS ET AUTOCOLLANTS',
+                value: `**Statiques :** \`${guild.emojis.cache.filter(e => !e.animated).size}\`\n**Animés :** \`${guild.emojis.cache.filter(e => e.animated).size}\`\n**Autocollants :** \`${guild.stickers.cache.size}\``,
                 inline: true
             },
             {
                 name: 'CONFIGURATION',
-                value: `**Langue :** \`${guild.preferredLocale || 'Non definie'}\`\n**AFK :** \`${guild.afkChannelId ? guild.channels.cache.get(guild.afkChannelId)?.name || 'Inconnu' : 'Aucun'}\` (${guild.afkTimeout || 0}s)\n**URL personnalisee :** \`${guild.vanityURLCode ? `discord.gg/${guild.vanityURLCode}` : 'Aucune'}\``,
+                value: `**Langue :** \`${guild.preferredLocale || 'Non définie'}\`\n**AFK :** \`${guild.afkChannelId ? guild.channels.cache.get(guild.afkChannelId)?.name || 'Inconnu' : 'Aucun'}\` (${guild.afkTimeout || 0}s)\n**URL personnalisée :** \`${guild.vanityURLCode ? `discord.gg/${guild.vanityURLCode}` : 'Aucune'}\``,
                 inline: false
             },
             {
-                name: 'FONCTIONNALITES',
+                name: 'FONCTIONNALITÉS',
                 value: guild.features.length > 0 ? guild.features.map(f => `\`${f}\``).join(', ') : 'Aucune',
                 inline: false
             },
@@ -434,21 +386,16 @@ function construireEmbedResume(guild) {
             },
             {
                 name: 'FICHIER JOINT',
-                value: 'L\'integralite des donnees brutes (permissions de chaque salon et role, liste complete des membres, emojis, etc.) est disponible dans le fichier `.txt` ci-joint.',
+                value: 'L\'intégralité des données brutes (permissions de chaque salon et rôle, liste complète des membres, émojis, etc.) est disponible dans le fichier `.txt` ci-joint.',
                 inline: false
             }
         )
         .setFooter({
-            text: `Division Vanguard — Systeme d'information`,
+            text: 'Division Vanguard — Système d\'information',
             iconURL: guild.iconURL() || undefined
         });
-
-    return embed;
 }
 
-/**
- * Point d'entrée principal : retourne l'embed + le fichier
- */
 function collectServerInfo(guild) {
     const rapport = genererRapportComplet(guild);
     const buffer = Buffer.from(rapport, 'utf-8');
