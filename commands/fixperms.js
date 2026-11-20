@@ -39,14 +39,24 @@ const ROLES = {
         '1502321896212009001', // Soldat
         '1502472415127666780'  // Engagé Volontaire Initial
     ],
-    SPECIALITES: [
-        '1502321914516078652', // Pilote
-        '1502321915962986516', // Pilote Chef
-        '1502321916692926695', // Opérateur Mission
-        '1502321917535715328', // Forces Spéciales
-        '1502321918387425450', // Médecin
-        '1502321919662493758'  // Sniper Élite
-    ],
+    SPECIALITES: {
+        PILOTE: [
+            '1502321914516078652', // Pilote
+            '1502321915962986516'  // Pilote Chef
+        ],
+        OPERATEUR_MISSION: [
+            '1502321916692926695'  // Opérateur Mission
+        ],
+        FORCES_SPECIALES: [
+            '1502321917535715328'  // Forces Spéciales
+        ],
+        MEDECIN: [
+            '1502321918387425450'  // Médecin
+        ],
+        SNIPER: [
+            '1502321919662493758'  // Sniper Élite
+        ]
+    },
     CIRFA: [
         '1503124531391365203', // CIRFA
         '1507547514264485969', // CIRFA spécialité
@@ -59,22 +69,18 @@ const ROLES = {
 const TOUS_MILITAIRES = [
     ...ROLES.OFFICIER,
     ...ROLES.SOUS_OFFICIER,
-    ...ROLES.MILITAIRE,
-    ...ROLES.SPECIALITES
+    ...ROLES.MILITAIRE
 ];
 
 const HAUT_COMMANDMENT = [
     ...ROLES.STAFF,
-    ...ROLES.OFFICIER.slice(0, 7)
+    ...ROLES.OFFICIER.slice(0, 7) // Du Général Armée au Commandant
 ];
 
 // ============================================================================
 // UTILITAIRES
 // ============================================================================
 
-/**
- * Vérifie si un salon est un thread (hérite des permissions du parent)
- */
 function estThread(salon) {
     return salon.isThread?.() || 
            salon.type === ChannelType.PublicThread || 
@@ -82,34 +88,6 @@ function estThread(salon) {
            salon.type === ChannelType.AnnouncementThread;
 }
 
-/**
- * Filtre une liste d'IDs de rôles pour ne garder que ceux qui sont dans le cache
- * ET qui sont modifiables par le bot (en dessous de son rôle le plus haut)
- */
-function filtrerRolesAccessibles(guild, roleIds) {
-    const botRole = guild.members.me.roles.highest;
-    const accessibles = [];
-    const inaccessibles = [];
-    
-    for (const id of roleIds) {
-        const role = guild.roles.cache.get(id);
-        if (!role) {
-            inaccessibles.push({ id, raison: 'Non trouvé dans le cache' });
-            continue;
-        }
-        if (role.position >= botRole.position) {
-            inaccessibles.push({ id, nom: role.name, raison: 'Position supérieure au bot' });
-            continue;
-        }
-        accessibles.push(id);
-    }
-    
-    return { accessibles, inaccessibles };
-}
-
-/**
- * Construit un tableau de permissions en filtrant automatiquement les rôles inaccessibles
- */
 function construirePermissions(guild, specifications) {
     const botRole = guild.members.me.roles.highest;
     const permissions = [];
@@ -315,6 +293,49 @@ function modeleOperationsMilitaires(guild) {
     ]);
 }
 
+function modeleUnitesSpeciales(salon, guild) {
+    const nomSalon = salon.name.toLowerCase();
+    
+    // Détection du salon spécifique pour la spécialité
+    let rolesSpecialite = [];
+    
+    if (nomSalon.includes('pilote') || nomSalon.includes('briefing-aerien')) {
+        rolesSpecialite = ROLES.SPECIALITES.PILOTE;
+    } else if (nomSalon.includes('forces-speciales') || nomSalon.includes('forces speciales')) {
+        rolesSpecialite = ROLES.SPECIALITES.FORCES_SPECIALES;
+    } else if (nomSalon.includes('medical') || nomSalon.includes('medic')) {
+        rolesSpecialite = ROLES.SPECIALITES.MEDECIN;
+    } else if (nomSalon.includes('sniper')) {
+        rolesSpecialite = ROLES.SPECIALITES.SNIPER;
+    } else if (nomSalon.includes('operateur') || nomSalon.includes('opérateur')) {
+        rolesSpecialite = ROLES.SPECIALITES.OPERATEUR_MISSION;
+    }
+    
+    // Construction des permissions : spécialité spécifique + Staff + Bot
+    return construirePermissions(guild, [
+        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+        ...rolesSpecialite.map(id => ({
+            id,
+            allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory
+            ]
+        })),
+        ...ROLES.STAFF.map(id => ({
+            id,
+            allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ManageMessages,
+                PermissionFlagsBits.ReadMessageHistory,
+                PermissionFlagsBits.ManageChannels
+            ]
+        })),
+        { id: ROLES.BOT, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
+    ]);
+}
+
 function modeleAdministrationInterne(guild) {
     return construirePermissions(guild, [
         { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
@@ -342,39 +363,6 @@ function modeleEtatMajor(guild) {
                 PermissionFlagsBits.SendMessages,
                 PermissionFlagsBits.ReadMessageHistory,
                 PermissionFlagsBits.ManageMessages
-            ]
-        })),
-        { id: ROLES.BOT, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
-    ]);
-}
-
-function modeleUnitesSpeciales(guild) {
-    return construirePermissions(guild, [
-        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        ...ROLES.SPECIALITES.map(id => ({
-            id,
-            allow: [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.ReadMessageHistory
-            ]
-        })),
-        ...TOUS_MILITAIRES.map(id => ({
-            id,
-            allow: [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.ReadMessageHistory
-            ]
-        })),
-        ...ROLES.STAFF.map(id => ({
-            id,
-            allow: [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.ManageMessages,
-                PermissionFlagsBits.ReadMessageHistory,
-                PermissionFlagsBits.ManageChannels
             ]
         })),
         { id: ROLES.BOT, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
@@ -491,16 +479,16 @@ function detecterModele(salon, guild) {
         return { nom: 'Opérations Militaires', ...modeleOperationsMilitaires(guild) };
     }
     
+    if (nomCategorie.includes('unités spéciales') || nomCategorie.includes('unites speciales')) {
+        return { nom: 'Unités Spéciales', ...modeleUnitesSpeciales(salon, guild) };
+    }
+    
     if (nomCategorie.includes('administration interne')) {
         return { nom: 'Administration Interne', ...modeleAdministrationInterne(guild) };
     }
     
     if (nomCategorie.includes('état major') || nomCategorie.includes('etat major')) {
         return { nom: 'État-Major', ...modeleEtatMajor(guild) };
-    }
-    
-    if (nomCategorie.includes('unités spéciales') || nomCategorie.includes('unites speciales')) {
-        return { nom: 'Unités Spéciales', ...modeleUnitesSpeciales(guild) };
     }
     
     if (nomCategorie.includes('formation') || nomCategorie.includes('entrainement') || nomCategorie.includes('entraînement')) {
