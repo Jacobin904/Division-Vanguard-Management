@@ -1147,7 +1147,6 @@ module.exports = {
                     if (!estAdministrateur(interaction.member)) {
                         return interaction.reply({
                             content: "Vous n'êtes pas autorisé à publier une interface de ticket.",
-                            flags: MessageFlags.Ephemeral
                         });
                     }
                     const type = interaction.options.getString('type');
