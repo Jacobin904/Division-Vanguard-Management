@@ -69,30 +69,47 @@ const HAUT_COMMANDMENT = [
 ];
 
 // ============================================================================
-// FILTRAGE DYNAMIQUE DES RÔLES ACCESSIBLES
+// UTILITAIRES
 // ============================================================================
 
+/**
+ * Vérifie si un salon est un thread (hérite des permissions du parent)
+ */
+function estThread(salon) {
+    return salon.isThread?.() || 
+           salon.type === ChannelType.PublicThread || 
+           salon.type === ChannelType.PrivateThread || 
+           salon.type === ChannelType.AnnouncementThread;
+}
+
+/**
+ * Filtre une liste d'IDs de rôles pour ne garder que ceux qui sont dans le cache
+ * ET qui sont modifiables par le bot (en dessous de son rôle le plus haut)
+ */
 function filtrerRolesAccessibles(guild, roleIds) {
     const botRole = guild.members.me.roles.highest;
-    if (!botRole) return { accessibles: [], inaccessibles: [] };
-    
     const accessibles = [];
     const inaccessibles = [];
     
     for (const id of roleIds) {
         const role = guild.roles.cache.get(id);
-        if (!role) continue;
-        
-        if (role.position < botRole.position) {
-            accessibles.push(id);
-        } else {
-            inaccessibles.push({ id, nom: role.name, position: role.position });
+        if (!role) {
+            inaccessibles.push({ id, raison: 'Non trouvé dans le cache' });
+            continue;
         }
+        if (role.position >= botRole.position) {
+            inaccessibles.push({ id, nom: role.name, raison: 'Position supérieure au bot' });
+            continue;
+        }
+        accessibles.push(id);
     }
     
     return { accessibles, inaccessibles };
 }
 
+/**
+ * Construit un tableau de permissions en filtrant automatiquement les rôles inaccessibles
+ */
 function construirePermissions(guild, specifications) {
     const botRole = guild.members.me.roles.highest;
     const permissions = [];
@@ -107,13 +124,14 @@ function construirePermissions(guild, specifications) {
             });
         } else {
             const role = guild.roles.cache.get(spec.id);
-            if (!role) continue;
-            
-            if (role.position >= botRole.position) {
-                rolesIgnorés.push({ id: spec.id, nom: role.name, position: role.position });
+            if (!role) {
+                rolesIgnorés.push({ id: spec.id, raison: 'Non trouvé dans le cache' });
                 continue;
             }
-            
+            if (role.position >= botRole.position) {
+                rolesIgnorés.push({ id: spec.id, nom: role.name, raison: 'Position supérieure au bot' });
+                continue;
+            }
             permissions.push({
                 id: spec.id,
                 allow: spec.allow || [],
@@ -522,15 +540,33 @@ module.exports = {
             return interaction.editReply({ content: '[ERREUR CRITIQUE] Le bot ne possède pas les permissions nécessaires. Opération annulée.' });
         }
 
+        // ÉTAPE 1 : Forcer le chargement de tous les rôles dans le cache
+        await interaction.editReply({ content: '[ÉTAPE 1/3] Chargement des rôles en mémoire...' });
+        try {
+            await guild.roles.fetch();
+        } catch (erreur) {
+            console.error('[FIXPERMS] Erreur lors du fetch des rôles :', erreur.message);
+        }
+
         let salonsReussis = 0;
         let salonsEchoues = 0;
+        let threadsIgnorés = 0;
         let totalRolesIgnorés = 0;
         const detailsParModele = {};
         const tousLesRolesIgnorés = new Map();
 
+        // ÉTAPE 2 : Itération sur tous les salons
+        await interaction.editReply({ content: '[ÉTAPE 2/3] Application des permissions sur chaque salon...' });
+        
         const salons = guild.channels.cache.filter(c => c.type !== ChannelType.GuildCategory);
 
         for (const salon of salons.values()) {
+            // Ignorer les threads (ils héritent des permissions du salon parent)
+            if (estThread(salon)) {
+                threadsIgnorés++;
+                continue;
+            }
+
             try {
                 const { nom, permissions, rolesIgnorés } = detecterModele(salon, guild);
                 
@@ -545,10 +581,11 @@ module.exports = {
                 if (rolesIgnorés.length > 0) {
                     totalRolesIgnorés += rolesIgnorés.length;
                     for (const role of rolesIgnorés) {
-                        if (!tousLesRolesIgnorés.has(role.id)) {
-                            tousLesRolesIgnorés.set(role.id, { nom: role.nom, position: role.position, count: 0 });
+                        const key = role.id;
+                        if (!tousLesRolesIgnorés.has(key)) {
+                            tousLesRolesIgnorés.set(key, { nom: role.nom || 'Inconnu', raison: role.raison, count: 0 });
                         }
-                        tousLesRolesIgnorés.get(role.id).count++;
+                        tousLesRolesIgnorés.get(key).count++;
                     }
                 }
                 
@@ -556,32 +593,41 @@ module.exports = {
             } catch (erreur) {
                 salonsEchoues++;
                 const nomCategorie = salon.parentId ? (guild.channels.cache.get(salon.parentId)?.name || 'sans catégorie') : 'sans catégorie';
-                const { nom } = detecterModele(salon, guild);
-                if (!detailsParModele[nom]) detailsParModele[nom] = { reussis: 0, echoues: 0 };
-                detailsParModele[nom].echoues++;
+                let nomModele = 'Inconnu';
+                try {
+                    nomModele = detecterModele(salon, guild).nom;
+                } catch (e) {}
+                if (!detailsParModele[nomModele]) detailsParModele[nomModele] = { reussis: 0, echoues: 0 };
+                detailsParModele[nomModele].echoues++;
                 
                 console.error(`[FIXPERMS] Erreur sur ${salon.name} (${nomCategorie}) : ${erreur.message}`);
             }
         }
 
-        let rapport = `[RAPPORT] Réinitialisation terminée.\n`;
-        rapport += `Salons traités avec succès : ${salonsReussis}\n`;
-        rapport += `Salons en échec : ${salonsEchoues}\n`;
-        rapport += `Rôles ignorés (au-dessus du bot) : ${totalRolesIgnorés}\n\n`;
+        // ÉTAPE 3 : Rapport final
+        await interaction.editReply({ content: '[ÉTAPE 3/3] Génération du rapport final...' });
+
+        let rapport = `[RAPPORT] Réinitialisation terminée.\n\n`;
+        rapport += `[STATISTIQUES]\n`;
+        rapport += `  - Salons traités avec succès : ${salonsReussis}\n`;
+        rapport += `  - Salons en échec : ${salonsEchoues}\n`;
+        rapport += `  - Threads ignorés (héritent du parent) : ${threadsIgnorés}\n`;
+        rapport += `  - Rôles ignorés (inaccessibles) : ${totalRolesIgnorés}\n\n`;
         
-        rapport += `Détails par catégorie :\n`;
+        rapport += `[DÉTAILS PAR CATÉGORIE]\n`;
         for (const [modele, stats] of Object.entries(detailsParModele)) {
             rapport += `  - ${modele} : ${stats.reussis} succès, ${stats.echoues} échecs\n`;
         }
 
         if (tousLesRolesIgnorés.size > 0) {
-            rapport += `\nRôles ignorés car situés au-dessus du bot (position ${botRole.position}) :\n`;
+            rapport += `\n[RÔLES IGNORÉS]\n`;
+            rapport += `Ces rôles n'ont pas pu être configurés car ils sont inaccessibles au bot :\n`;
             for (const [id, info] of tousLesRolesIgnorés) {
-                rapport += `  - ${info.nom} (position ${info.position}) - ignoré ${info.count} fois\n`;
+                rapport += `  - ${info.nom} (${info.raison}) - ignoré ${info.count} fois\n`;
             }
-            rapport += `\n[IMPORTANT] Ces rôles n'ont pas pu être configurés car ils sont situés au-dessus du bot dans la hiérarchie. Pour les inclure, déplacez le rôle du bot au-dessus d'eux dans les paramètres du serveur.`;
+            rapport += `\n[IMPORTANT] Pour inclure ces rôles, déplacez le rôle du bot au-dessus d'eux dans les paramètres du serveur.`;
         } else {
-            rapport += `\n[SUCCÈS] Toutes les permissions ont été configurées correctement.`;
+            rapport += `\n[SUCCÈS] Toutes les permissions ont été configurées correctement selon le protocole de sécurité Division Vanguard.`;
         }
 
         await interaction.editReply({ content: rapport });
