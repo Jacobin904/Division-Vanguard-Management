@@ -373,31 +373,39 @@ async function creerTicket({ guild, membre, type, categorie, objet, motif, compl
     const premierRole = identifiantsEncadrement(type, ticket.categorie).find((id) => guild.roles.cache.has(id));
     if (premierRole) mentions.push(`<@&${premierRole}>`);
 
-    await salon.send({ content: mentions.join(' '), embeds: [accueil], components: [actions] });
+    try {
+        await salon.send({ content: mentions.join(' '), embeds: [accueil], components: [actions] });
+    } catch (erreur) {
+        console.error('[TICKETS] Erreur envoi message accueil :', erreur.message);
+    }
 
-    await sendToChannel(client, config.channels.logsBot, {
-        embed: construireEmbed(guild, {
-            service: 'Division Vanguard — Journal du service',
-            titre: 'OUVERTURE DE TICKET',
-            couleur: COULEURS.information,
-            description: `Le ticket ${code(reference)} a été ouvert.`,
-            champs: [
-                bloc('Dossier', [
-                    ligne('Référence', code(reference)),
-                    ligne('Service', libelleType(type)),
-                    ligne('Destinataire', libelleDestinataire(type, ticket.categorie)),
-                    ligne('Salon', `<#${salon.id}>`)
-                ]),
-                bloc('Requérant', [
-                    ligne('Membre', `${membre.user.username}`),
-                    ligne('Identifiant', code(membre.id)),
-                    ligne('Grade', ticket.grade)
-                ]),
-                bloc('Objet', [tronquer(objet, 900)])
-            ],
-            pied: `Division Vanguard — Référence ${reference}`
-        })
-    });
+    try {
+        await sendToChannel(client, config.channels.logsBot, {
+            embed: construireEmbed(guild, {
+                service: 'Division Vanguard — Journal du service',
+                titre: 'OUVERTURE DE TICKET',
+                couleur: COULEURS.information,
+                description: `Le ticket ${code(reference)} a été ouvert.`,
+                champs: [
+                    bloc('Dossier', [
+                        ligne('Référence', code(reference)),
+                        ligne('Service', libelleType(type)),
+                        ligne('Destinataire', libelleDestinataire(type, ticket.categorie)),
+                        ligne('Salon', `<#${salon.id}>`)
+                    ]),
+                    bloc('Requérant', [
+                        ligne('Membre', `${membre.user.username}`),
+                        ligne('Identifiant', code(membre.id)),
+                        ligne('Grade', ticket.grade)
+                    ]),
+                    bloc('Objet', [tronquer(objet, 900)])
+                ],
+                pied: `Division Vanguard — Référence ${reference}`
+            })
+        });
+    } catch (erreur) {
+        console.error('[TICKETS] Erreur envoi log :', erreur.message);
+    }
 
     return { salon, dejaExistant: false, ticket };
 }
