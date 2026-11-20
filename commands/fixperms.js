@@ -3,7 +3,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 
 // ============================================================================
-// CONFIGURATION DES RÔLES (IDs extraits du rapport)
+// CONFIGURATION DES RÔLES
 // ============================================================================
 const ROLES = {
     STAFF: [
@@ -65,38 +65,41 @@ const TOUS_MILITAIRES = [
 
 const HAUT_COMMANDMENT = [
     ...ROLES.STAFF,
-    ...ROLES.OFFICIER.slice(0, 7) // Du Général Armée au Commandant
+    ...ROLES.OFFICIER.slice(0, 7)
 ];
 
 // ============================================================================
 // FILTRAGE DYNAMIQUE DES RÔLES ACCESSIBLES
 // ============================================================================
 
-/**
- * Filtre une liste d'IDs de rôles pour ne garder que ceux que le bot peut modifier.
- * Un rôle est modifiable s'il est strictement en dessous du rôle le plus haut du bot.
- */
 function filtrerRolesAccessibles(guild, roleIds) {
     const botRole = guild.members.me.roles.highest;
-    if (!botRole) return [];
+    if (!botRole) return { accessibles: [], inaccessibles: [] };
     
-    return roleIds.filter(id => {
+    const accessibles = [];
+    const inaccessibles = [];
+    
+    for (const id of roleIds) {
         const role = guild.roles.cache.get(id);
-        if (!role) return false;
-        // Le rôle doit être strictement en dessous du rôle le plus haut du bot
-        return role.position < botRole.position;
-    });
+        if (!role) continue;
+        
+        if (role.position < botRole.position) {
+            accessibles.push(id);
+        } else {
+            inaccessibles.push({ id, nom: role.name, position: role.position });
+        }
+    }
+    
+    return { accessibles, inaccessibles };
 }
 
-/**
- * Construit un tableau de permissions en filtrant automatiquement les rôles inaccessibles.
- */
 function construirePermissions(guild, specifications) {
     const botRole = guild.members.me.roles.highest;
     const permissions = [];
+    const rolesIgnorés = [];
     
     for (const spec of specifications) {
-        if (spec.id === 'everyone' || spec.id === guild.id) {
+        if (spec.id === guild.id) {
             permissions.push({
                 id: guild.id,
                 allow: spec.allow || [],
@@ -105,8 +108,12 @@ function construirePermissions(guild, specifications) {
         } else {
             const role = guild.roles.cache.get(spec.id);
             if (!role) continue;
-            // Ignorer les rôles au-dessus ou au même niveau que le bot
-            if (role.position >= botRole.position) continue;
+            
+            if (role.position >= botRole.position) {
+                rolesIgnorés.push({ id: spec.id, nom: role.name, position: role.position });
+                continue;
+            }
+            
             permissions.push({
                 id: spec.id,
                 allow: spec.allow || [],
@@ -115,11 +122,11 @@ function construirePermissions(guild, specifications) {
         }
     }
     
-    return permissions;
+    return { permissions, rolesIgnorés };
 }
 
 // ============================================================================
-// MODÈLES DE PERMISSIONS PAR CATÉGORIE
+// MODÈLES DE PERMISSIONS
 // ============================================================================
 
 function modeleModeratorOnly(guild) {
@@ -439,65 +446,54 @@ function modeleSalonVocal(salon, guild) {
 }
 
 // ============================================================================
-// DÉTECTION DU MODÈLE À APPLIQUER
+// DÉTECTION DU MODÈLE
 // ============================================================================
 
 function detecterModele(salon, guild) {
     const nomCategorie = salon.parentId ? (guild.channels.cache.get(salon.parentId)?.name || '').toLowerCase() : '';
     const nomSalon = salon.name.toLowerCase();
     
-    // 1. MODERATOR-ONLY
     if (nomSalon === 'moderator-only') {
-        return { nom: 'Moderator-Only', modele: modeleModeratorOnly(guild) };
+        return { nom: 'Moderator-Only', ...modeleModeratorOnly(guild) };
     }
     
-    // 2. INFORMATION RP
     if (nomCategorie.includes('information rp')) {
-        return { nom: 'Information RP', modele: modeleInformationRP(guild) };
+        return { nom: 'Information RP', ...modeleInformationRP(guild) };
     }
     
-    // 3. AIDE RECRUE
     if (nomCategorie.includes('aide recrue')) {
-        return { nom: 'Aide Recrue', modele: modeleAideRecrue(salon, guild) };
+        return { nom: 'Aide Recrue', ...modeleAideRecrue(salon, guild) };
     }
     
-    // 4. COMMUNICATION GÉNÉRALE
     if (nomCategorie.includes('communication generale') || nomCategorie.includes('communication générale')) {
-        return { nom: 'Communication Générale', modele: modeleCommunicationGenerale(salon, guild) };
+        return { nom: 'Communication Générale', ...modeleCommunicationGenerale(salon, guild) };
     }
     
-    // 5. OPÉRATIONS MILITAIRES
     if (nomCategorie.includes('opérations militaires') || nomCategorie.includes('operations militaires')) {
-        return { nom: 'Opérations Militaires', modele: modeleOperationsMilitaires(guild) };
+        return { nom: 'Opérations Militaires', ...modeleOperationsMilitaires(guild) };
     }
     
-    // 6. ADMINISTRATION INTERNE
     if (nomCategorie.includes('administration interne')) {
-        return { nom: 'Administration Interne', modele: modeleAdministrationInterne(guild) };
+        return { nom: 'Administration Interne', ...modeleAdministrationInterne(guild) };
     }
     
-    // 7. ÉTAT-MAJOR
     if (nomCategorie.includes('état major') || nomCategorie.includes('etat major')) {
-        return { nom: 'État-Major', modele: modeleEtatMajor(guild) };
+        return { nom: 'État-Major', ...modeleEtatMajor(guild) };
     }
     
-    // 8. UNITÉS SPÉCIALES
     if (nomCategorie.includes('unités spéciales') || nomCategorie.includes('unites speciales')) {
-        return { nom: 'Unités Spéciales', modele: modeleUnitesSpeciales(guild) };
+        return { nom: 'Unités Spéciales', ...modeleUnitesSpeciales(guild) };
     }
     
-    // 9. FORMATION ET ENTRAÎNEMENT
     if (nomCategorie.includes('formation') || nomCategorie.includes('entrainement') || nomCategorie.includes('entraînement')) {
-        return { nom: 'Formation', modele: modeleFormationEntrainement(guild) };
+        return { nom: 'Formation', ...modeleFormationEntrainement(guild) };
     }
     
-    // 10. SALONS VOCAUX
     if (salon.type === ChannelType.GuildVoice) {
-        return { nom: 'Vocal', modele: modeleSalonVocal(salon, guild) };
+        return { nom: 'Vocal', ...modeleSalonVocal(salon, guild) };
     }
     
-    // 11. DÉFAUT : Communication Générale
-    return { nom: 'Défaut', modele: modeleCommunicationGenerale(salon, guild) };
+    return { nom: 'Défaut', ...modeleCommunicationGenerale(salon, guild) };
 }
 
 // ============================================================================
@@ -526,59 +522,66 @@ module.exports = {
             return interaction.editReply({ content: '[ERREUR CRITIQUE] Le bot ne possède pas les permissions nécessaires. Opération annulée.' });
         }
 
-        let salonsTraités = 0;
         let salonsReussis = 0;
-        let erreurs = 0;
-        const rolesInaccessibles = new Set();
+        let salonsEchoues = 0;
+        let totalRolesIgnorés = 0;
         const detailsParModele = {};
+        const tousLesRolesIgnorés = new Map();
 
         const salons = guild.channels.cache.filter(c => c.type !== ChannelType.GuildCategory);
 
         for (const salon of salons.values()) {
             try {
-                const { nom, modele } = detecterModele(salon, guild);
+                const { nom, permissions, rolesIgnorés } = detecterModele(salon, guild);
                 
                 if (!detailsParModele[nom]) {
                     detailsParModele[nom] = { reussis: 0, echoues: 0 };
                 }
 
-                await salon.permissionOverwrites.set(modele, 'Réinitialisation protocolaire par /fixperms');
+                await salon.permissionOverwrites.set(permissions, 'Réinitialisation protocolaire par /fixperms');
                 salonsReussis++;
                 detailsParModele[nom].reussis++;
                 
+                if (rolesIgnorés.length > 0) {
+                    totalRolesIgnorés += rolesIgnorés.length;
+                    for (const role of rolesIgnorés) {
+                        if (!tousLesRolesIgnorés.has(role.id)) {
+                            tousLesRolesIgnorés.set(role.id, { nom: role.nom, position: role.position, count: 0 });
+                        }
+                        tousLesRolesIgnorés.get(role.id).count++;
+                    }
+                }
+                
                 await new Promise(resolve => setTimeout(resolve, 250));
             } catch (erreur) {
-                salonsTraités++;
-                erreurs++;
+                salonsEchoues++;
                 const nomCategorie = salon.parentId ? (guild.channels.cache.get(salon.parentId)?.name || 'sans catégorie') : 'sans catégorie';
                 const { nom } = detecterModele(salon, guild);
                 if (!detailsParModele[nom]) detailsParModele[nom] = { reussis: 0, echoues: 0 };
                 detailsParModele[nom].echoues++;
                 
                 console.error(`[FIXPERMS] Erreur sur ${salon.name} (${nomCategorie}) : ${erreur.message}`);
-                
-                if (erreur.message.includes('position') || erreur.message.includes('hierarchy')) {
-                    rolesInaccessibles.add(salon.name);
-                }
             }
         }
 
-        // Construction du message de rapport
         let rapport = `[RAPPORT] Réinitialisation terminée.\n`;
         rapport += `Salons traités avec succès : ${salonsReussis}\n`;
-        rapport += `Erreurs rencontrées : ${erreurs}\n\n`;
+        rapport += `Salons en échec : ${salonsEchoues}\n`;
+        rapport += `Rôles ignorés (au-dessus du bot) : ${totalRolesIgnorés}\n\n`;
         
         rapport += `Détails par catégorie :\n`;
         for (const [modele, stats] of Object.entries(detailsParModele)) {
             rapport += `  - ${modele} : ${stats.reussis} succès, ${stats.echoues} échecs\n`;
         }
 
-        if (erreurs > 0) {
-            rapport += `\n[IMPORTANT] ${erreurs} salon(s) n'ont pas pu être configurés.\n`;
-            rapport += `Cause probable : le rôle du bot (position ${botRole.position}) est situé en dessous de certains rôles à modifier.\n`;
-            rapport += `Solution : déplacez le rôle "Division Vanguard Management" tout en haut de la hiérarchie des rôles dans les paramètres du serveur, puis relancez la commande.`;
+        if (tousLesRolesIgnorés.size > 0) {
+            rapport += `\nRôles ignorés car situés au-dessus du bot (position ${botRole.position}) :\n`;
+            for (const [id, info] of tousLesRolesIgnorés) {
+                rapport += `  - ${info.nom} (position ${info.position}) - ignoré ${info.count} fois\n`;
+            }
+            rapport += `\n[IMPORTANT] Ces rôles n'ont pas pu être configurés car ils sont situés au-dessus du bot dans la hiérarchie. Pour les inclure, déplacez le rôle du bot au-dessus d'eux dans les paramètres du serveur.`;
         } else {
-            rapport += `\n[SUCCÈS] Toutes les permissions ont été configurées correctement selon le protocole de sécurité Division Vanguard.`;
+            rapport += `\n[SUCCÈS] Toutes les permissions ont été configurées correctement.`;
         }
 
         await interaction.editReply({ content: rapport });
