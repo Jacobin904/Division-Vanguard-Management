@@ -3,7 +3,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 
 // ============================================================================
-// CONFIGURATION DES RÔLES CLÉS (Basée sur ton rapport)
+// CONFIGURATION DES RÔLES CLÉS (Basée sur le rapport du serveur)
 // ============================================================================
 const ROLES = {
     ADMIN: [
@@ -115,7 +115,7 @@ const MODELES = {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('fixperms')
-        .setDescription('Réinitialise et configure intégralement les permissions de tous les salons selon le protocole Division Vanguard (Admin uniquement)')
+        .setDescription('Réinitialise les permissions des salons et rôles selon le protocole (Admin uniquement)')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .setDMPermission(false),
 
@@ -135,7 +135,6 @@ module.exports = {
 
         let salonsTraités = 0;
         let erreurs = 0;
-        const messagesProgression = [];
 
         const channels = guild.channels.cache.filter(c => c.type !== ChannelType.GuildCategory);
 
@@ -157,7 +156,7 @@ module.exports = {
                 } else if (nomCategorie.includes('formation et entraînement')) {
                     nouvellesPermissions = MODELES.FORMATION(guild);
                 } else if (nomCategorie.includes('état major')) {
-                    nouvellesPermissions = MODELES.OPERATIONS(guild); // État-Major suit les règles opérationnelles
+                    nouvellesPermissions = MODELES.OPERATIONS(guild);
                 } else if (salon.type === ChannelType.GuildVoice) {
                     if (nomCategorie.includes('salons vocaux') && (nomSalon.includes('général') || nomSalon.includes('afk') || nomSalon.includes('formation'))) {
                         nouvellesPermissions = MODELES.VOCAL_GENERAL(guild);
@@ -165,18 +164,15 @@ module.exports = {
                         nouvellesPermissions = MODELES.VOCAL_RESTREINT(guild);
                     }
                 } else {
-                    // Fallback par défaut
                     nouvellesPermissions = MODELES.COMMUNICATION(guild);
                 }
 
                 // 2. EXCEPTIONS SPÉCIFIQUES PAR SALON (Surcharge du modèle de base)
                 if (nomSalon.includes('règle') || nomSalon.includes('regle')) {
-                    // Autoriser les réactions pour les règles
                     const everyoneRule = nouvellesPermissions.find(p => p.id === guild.id);
                     if (everyoneRule) everyoneRule.allow.push(PermissionFlagsBits.AddReactions);
                 } 
                 else if (nomSalon.includes('annonce')) {
-                    // Personne ne peut écrire sauf le staff
                     nouvellesPermissions = [
                         { id: guild.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads] },
                         ...ROLES.ADMIN.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory] })),
@@ -184,18 +180,15 @@ module.exports = {
                     ];
                 }
                 else if (nomSalon.includes('log') || nomSalon.includes('config') || nomSalon.includes('sanction-interne')) {
-                    // Réservé strictement à l'administration interne
                     nouvellesPermissions = MODELES.ADMIN_INTERNE(guild);
                 }
                 else if (nomSalon.includes('resultat') || nomSalon.includes('registre-promotion')) {
-                    // Réservé au staff et officiers
                     nouvellesPermissions = [
                         { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
                         ...[...ROLES.ADMIN, ...ROLES.STAFF, ...ROLES.OFFICIER].map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages] }))
                     ];
                 }
                 else if (nomSalon.includes('bot-commande')) {
-                    // Autoriser l'utilisation des commandes pour tous
                     const everyoneCmd = nouvellesPermissions.find(p => p.id === guild.id);
                     if (everyoneCmd && !everyoneCmd.allow.includes(PermissionFlagsBits.UseApplicationCommands)) {
                         everyoneCmd.allow.push(PermissionFlagsBits.UseApplicationCommands);
