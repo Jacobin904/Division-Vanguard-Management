@@ -12,7 +12,8 @@ const {
     StringSelectMenuBuilder,
     TextInputBuilder,
     TextInputStyle,
-    AttachmentBuilder
+    AttachmentBuilder,
+    EmbedBuilder
 } = require('discord.js');
 
 const config = require('../config/guildConfig');
@@ -33,13 +34,51 @@ const DOSSIER_DONNEES = path.join(__dirname, '..', 'data');
 const FICHIER_TICKETS = path.join(DOSSIER_DONNEES, 'tickets.json');
 const verrousCloture = new Set();
 
+// ============================================================================
+// PRIORITÉS
+// ============================================================================
+
+const PRIORITES = {
+    faible: {
+        nom: 'Faible',
+        couleur: 0x95A5A6,
+        description: 'Traitement dans les meilleurs délais'
+    },
+    moyen: {
+        nom: 'Moyen',
+        couleur: 0x3498DB,
+        description: 'Traitement prioritaire'
+    },
+    élevé: {
+        nom: 'Élevé',
+        couleur: 0xE67E22,
+        description: 'Traitement urgent'
+    },
+    critique: {
+        nom: 'Critique',
+        couleur: 0xE74C3C,
+        description: 'Traitement immédiat requis'
+    }
+};
+
+// ============================================================================
+// PERSISTANCE
+// ============================================================================
+
 function structureInitiale() {
-    return { compteurs: { rdv: 0, support: 0 }, panneaux: {}, actifs: {}, archives: [] };
+    return {
+        compteurs: { rdv: 0, support: 0 },
+        panneaux: {},
+        actifs: {},
+        archives: []
+    };
 }
 
 function charger() {
     try {
-        if (!fs.existsSync(DOSSIER_DONNEES)) fs.mkdirSync(DOSSIER_DONNEES, { recursive: true });
+        if (!fs.existsSync(DOSSIER_DONNEES)) {
+            fs.mkdirSync(DOSSIER_DONNEES, { recursive: true });
+        }
         if (!fs.existsSync(FICHIER_TICKETS)) {
             fs.writeFileSync(FICHIER_TICKETS, JSON.stringify(structureInitiale(), null, 2), 'utf8');
             return structureInitiale();
@@ -59,7 +98,9 @@ function charger() {
 
 function sauvegarder(donnees) {
     try {
-        if (!fs.existsSync(DOSSIER_DONNEES)) fs.mkdirSync(DOSSIER_DONNEES, { recursive: true });
+        if (!fs.existsSync(DOSSIER_DONNEES)) {
+            fs.mkdirSync(DOSSIER_DONNEES, { recursive: true });
+        }
         const temporaire = `${FICHIER_TICKETS}.tmp`;
         fs.writeFileSync(temporaire, JSON.stringify(donnees, null, 2), 'utf8');
         fs.renameSync(temporaire, FICHIER_TICKETS);
@@ -75,6 +116,10 @@ function referenceSuivante(type) {
     const prefixe = type === 'rdv' ? 'RDV' : 'SUP';
     return `${prefixe}-${String(donnees.compteurs[type]).padStart(4, '0')}`;
 }
+
+// ============================================================================
+// UTILITAIRES
+// ============================================================================
 
 function libelleType(type) {
     return type === 'rdv' ? 'Rendez-vous' : 'Assistance';
@@ -102,6 +147,23 @@ function assainirNom(valeur) {
         .replace(/^-|-$/g, '')
         .slice(0, 24) || 'membre';
 }
+
+function obtenirTicketActuel(channelId) {
+    const donnees = charger();
+    return donnees.actifs[channelId] || null;
+}
+
+function verifierTicketActif(interaction) {
+    const ticket = obtenirTicketActuel(interaction.channel.id);
+    if (!ticket) {
+        throw new Error('Ce salon n\'est pas un ticket actif.');
+    }
+    return ticket;
+}
+
+// ============================================================================
+// PANNEAUX
+// ============================================================================
 
 function construirePanneau(guild, type) {
     const estRdv = type === 'rdv';
@@ -244,6 +306,10 @@ async function publierPanneau(guild, type) {
     return { salon, message };
 }
 
+// ============================================================================
+// CRÉATION DE TICKET
+// ============================================================================
+
 function ticketOuvertPar(userId, type) {
     const donnees = charger();
     return Object.values(donnees.actifs).find(
@@ -324,13 +390,17 @@ async function creerTicket({ guild, membre, type, categorie, objet, motif, compl
         grade: gradeLePlusEleve(membre),
         salonId: salon.id,
         statut: 'ouvert',
+        priorite: 'moyen',
         priseEnChargePar: null,
+        membresAjoutes: [],
         ouvertLe: new Date().toISOString()
     };
 
     const donnees = charger();
     donnees.actifs[salon.id] = ticket;
     sauvegarder(donnees);
+
+    const prioriteInfo = PRIORITES[ticket.priorite];
 
     const accueil = construireEmbed(guild, {
         service: `Division Vanguard — ${libelleType(type)}`,
@@ -349,6 +419,7 @@ async function creerTicket({ guild, membre, type, categorie, objet, motif, compl
             bloc('Orientation', [
                 ligne('Service', libelleType(type)),
                 ligne('Destinataire', libelleDestinataire(type, ticket.categorie)),
+                ligne('Priorité', `${prioriteInfo.nom} — ${prioriteInfo.description}`),
                 ligne('État', 'En attente de prise en charge')
             ]),
             bloc('Objet', [tronquer(objet, 900)]),
@@ -391,6 +462,7 @@ async function creerTicket({ guild, membre, type, categorie, objet, motif, compl
                         ligne('Référence', code(reference)),
                         ligne('Service', libelleType(type)),
                         ligne('Destinataire', libelleDestinataire(type, ticket.categorie)),
+                        ligne('Priorité', prioriteInfo.nom),
                         ligne('Salon', `<#${salon.id}>`)
                     ]),
                     bloc('Requérant', [
@@ -410,53 +482,347 @@ async function creerTicket({ guild, membre, type, categorie, objet, motif, compl
     return { salon, dejaExistant: false, ticket };
 }
 
-async function prendreEnCharge(interaction) {
-    const donnees = charger();
-    const ticket = donnees.actifs[interaction.channel.id];
+// ============================================================================
+// GESTION DES TICKETS
+// ============================================================================
 
-    if (!ticket) {
-        return interaction.reply({ content: "Ce salon n'est pas répertorié comme un ticket actif.", ephemeral: true });
-    }
+async function prendreEnCharge(interaction) {
+    const ticket = verifierTicketActif(interaction);
 
     if (!peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
-        return interaction.reply({
-            content: "Vous n'êtes pas habilité à prendre en charge ce dossier.",
-            ephemeral: true
-        });
+        throw new Error("Vous n'êtes pas habilité à prendre en charge ce dossier.");
     }
 
-    if (ticket.priseEnChargePar && ticket.priseEnChargePar !== interaction.user.id) {
-        return interaction.reply({
-            content: `Ce dossier est déjà suivi par <@${ticket.priseEnChargePar}>.`,
-            ephemeral: true
-        });
+    if (ticket.priseEnChargePar) {
+        throw new Error(`Ce dossier est déjà suivi par <@${ticket.priseEnChargePar}>.`);
     }
 
     ticket.priseEnChargePar = interaction.user.id;
     ticket.priseEnChargeNom = interaction.user.username;
     ticket.priseEnChargeLe = new Date().toISOString();
+
+    const donnees = charger();
     donnees.actifs[interaction.channel.id] = ticket;
     sauvegarder(donnees);
 
-    await interaction.reply({
-        embeds: [
-            construireEmbed(interaction.guild, {
-                service: 'Division Vanguard — Suivi de dossier',
-                titre: 'PRISE EN CHARGE',
-                couleur: COULEURS.succes,
-                description: `${interaction.member} assure désormais le suivi du ticket ${code(ticket.reference)}.`,
-                champs: [
-                    bloc('Responsable', [
-                        ligne('Membre', interaction.user.username),
-                        ligne('Grade', gradeLePlusEleve(interaction.member)),
-                        ligne('Horodatage', horodatageComplet(new Date()))
-                    ])
-                ],
-                pied: `Division Vanguard — Ticket ${ticket.reference}`
-            })
-        ]
+    const embed = construireEmbed(interaction.guild, {
+        service: 'Division Vanguard — Suivi de dossier',
+        titre: 'PRISE EN CHARGE',
+        couleur: COULEURS.succes,
+        description: `${interaction.member} assure désormais le suivi du ticket ${code(ticket.reference)}.`,
+        champs: [
+            bloc('Responsable', [
+                ligne('Membre', interaction.user.username),
+                ligne('Grade', gradeLePlusEleve(interaction.member)),
+                ligne('Horodatage', horodatageComplet(new Date()))
+            ])
+        ],
+        pied: `Division Vanguard — Ticket ${ticket.reference}`
     });
+
+    await interaction.editReply({ embeds: [embed] });
 }
+
+async function relacherPriseEnCharge(interaction) {
+    const ticket = verifierTicketActif(interaction);
+
+    if (!peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
+        throw new Error("Vous n'êtes pas habilité à gérer ce dossier.");
+    }
+
+    if (!ticket.priseEnChargePar) {
+        throw new Error("Ce dossier n'est pas actuellement pris en charge.");
+    }
+
+    if (ticket.priseEnChargePar !== interaction.user.id && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        throw new Error("Vous ne pouvez relâcher que votre propre prise en charge.");
+    }
+
+    ticket.priseEnChargePar = null;
+    ticket.priseEnChargeNom = null;
+    ticket.priseEnChargeLe = null;
+
+    const donnees = charger();
+    donnees.actifs[interaction.channel.id] = ticket;
+    sauvegarder(donnees);
+
+    const embed = construireEmbed(interaction.guild, {
+        service: 'Division Vanguard — Suivi de dossier',
+        titre: 'RELÂCHEMENT',
+        couleur: COULEURS.attention,
+        description: `${interaction.member} a relâché la prise en charge du ticket ${code(ticket.reference)}.`,
+        champs: [
+            bloc('État', [
+                ligne('Statut', 'En attente de prise en charge'),
+                ligne('Horodatage', horodatageComplet(new Date()))
+            ])
+        ],
+        pied: `Division Vanguard — Ticket ${ticket.reference}`
+            });
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+async function renommerTicket(interaction, nouveauNom) {
+    const ticket = verifierTicketActif(interaction);
+
+    if (!peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
+        throw new Error("Vous n'êtes pas habilité à renommer ce ticket.");
+    }
+
+    const nomAssaini = assainirNom(nouveauNom);
+    
+    try {
+        await interaction.channel.setName(nomAssaini, `Ticket renommé par ${interaction.user.username}`);
+    } catch (erreur) {
+        throw new Error(`Impossible de renommer le salon : ${erreur.message}`);
+    }
+
+    const embed = construireEmbed(interaction.guild, {
+        service: 'Division Vanguard — Gestion de ticket',
+        titre: 'RENONOMMAGE',
+        couleur: COULEURS.information,
+        description: `Le ticket ${code(ticket.reference)} a été renommé en \`${nomAssaini}\`.`,
+        champs: [
+            bloc('Détails', [
+                ligne('Ancien nom', interaction.channel.name),
+                ligne('Nouveau nom', nomAssaini),
+                ligne('Responsable', interaction.user.username),
+                ligne('Horodatage', horodatageComplet(new Date()))
+            ])
+        ],
+        pied: `Division Vanguard — Ticket ${ticket.reference}`
+    });
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+async function changerPriorite(interaction, niveau) {
+    const ticket = verifierTicketActif(interaction);
+
+    if (!peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
+        throw new Error("Vous n'êtes pas habilité à modifier la priorité de ce ticket.");
+    }
+
+    const prioriteInfo = PRIORITES[niveau];
+    if (!prioriteInfo) {
+        throw new Error("Niveau de priorité invalide.");
+    }
+
+    const anciennePriorite = PRIORITES[ticket.priorite].nom;
+    ticket.priorite = niveau;
+
+    const donnees = charger();
+    donnees.actifs[interaction.channel.id] = ticket;
+    sauvegarder(donnees);
+
+    const embed = construireEmbed(interaction.guild, {
+        service: 'Division Vanguard — Gestion de ticket',
+        titre: 'CHANGEMENT DE PRIORITÉ',
+        couleur: prioriteInfo.couleur,
+        description: `La priorité du ticket ${code(ticket.reference)} a été modifiée.`,
+        champs: [
+            bloc('Détails', [
+                ligne('Ancienne priorité', anciennePriorite),
+                ligne('Nouvelle priorité', `${prioriteInfo.nom} — ${prioriteInfo.description}`),
+                ligne('Responsable', interaction.user.username),
+                ligne('Horodatage', horodatageComplet(new Date()))
+            ])
+        ],
+        pied: `Division Vanguard — Ticket ${ticket.reference}`
+    });
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+async function ajouterMembre(interaction, membre) {
+    const ticket = verifierTicketActif(interaction);
+
+    if (!peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
+        throw new Error("Vous n'êtes pas habilité à ajouter des membres à ce ticket.");
+    }
+
+    if (ticket.membresAjoutes.includes(membre.id)) {
+        throw new Error("Ce membre est déjà ajouté au ticket.");
+    }
+
+    try {
+        await interaction.channel.permissionOverwrites.edit(membre.id, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true,
+            AttachFiles: true
+        });
+    } catch (erreur) {
+        throw new Error(`Impossible d'ajouter le membre : ${erreur.message}`);
+    }
+
+    ticket.membresAjoutes.push(membre.id);
+
+    const donnees = charger();
+    donnees.actifs[interaction.channel.id] = ticket;
+    sauvegarder(donnees);
+
+    const embed = construireEmbed(interaction.guild, {
+        service: 'Division Vanguard — Gestion de ticket',
+        titre: 'AJOUT DE MEMBRE',
+        couleur: COULEURS.succes,
+        description: `${membre} a été ajouté au ticket ${code(ticket.reference)}.`,
+        champs: [
+            bloc('Détails', [
+                ligne('Membre ajouté', `${membre.user.username} (${membre.id})`),
+                ligne('Responsable', interaction.user.username),
+                ligne('Horodatage', horodatageComplet(new Date()))
+            ])
+        ],
+        pied: `Division Vanguard — Ticket ${ticket.reference}`
+    });
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+async function retirerMembre(interaction, membre) {
+    const ticket = verifierTicketActif(interaction);
+
+    if (!peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
+        throw new Error("Vous n'êtes pas habilité à retirer des membres de ce ticket.");
+    }
+
+    if (!ticket.membresAjoutes.includes(membre.id)) {
+        throw new Error("Ce membre n'est pas ajouté au ticket.");
+    }
+
+    if (membre.id === ticket.auteurId) {
+        throw new Error("Impossible de retirer le requérant du ticket.");
+    }
+
+    try {
+        await interaction.channel.permissionOverwrites.delete(membre.id);
+    } catch (erreur) {
+        throw new Error(`Impossible de retirer le membre : ${erreur.message}`);
+    }
+
+    ticket.membresAjoutes = ticket.membresAjoutes.filter(id => id !== membre.id);
+
+    const donnees = charger();
+    donnees.actifs[interaction.channel.id] = ticket;
+    sauvegarder(donnees);
+
+    const embed = construireEmbed(interaction.guild, {
+        service: 'Division Vanguard — Gestion de ticket',
+        titre: 'RETRAIT DE MEMBRE',
+        couleur: COULEURS.attention,
+        description: `${membre} a été retiré du ticket ${code(ticket.reference)}.`,
+        champs: [
+            bloc('Détails', [
+                ligne('Membre retiré', `${membre.user.username} (${membre.id})`),
+                ligne('Responsable', interaction.user.username),
+                ligne('Horodatage', horodatageComplet(new Date()))
+            ])
+        ],
+        pied: `Division Vanguard — Ticket ${ticket.reference}`
+    });
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+async function afficherInfoTicket(interaction) {
+    const ticket = verifierTicketActif(interaction);
+
+    const prioriteInfo = PRIORITES[ticket.priorite];
+    const membresAjoutes = ticket.membresAjoutes.length > 0
+        ? ticket.membresAjoutes.map(id => `<@${id}>`).join(', ')
+        : 'Aucun';
+
+    const embed = construireEmbed(interaction.guild, {
+        service: `Division Vanguard — ${libelleType(ticket.type)}`,
+        titre: `INFORMATIONS DU TICKET ${ticket.reference}`,
+        couleur: prioriteInfo.couleur,
+        champs: [
+            bloc('Identification', [
+                ligne('Référence', code(ticket.reference)),
+                ligne('Type', libelleType(ticket.type)),
+                ligne('Destinataire', libelleDestinataire(ticket.type, ticket.categorie)),
+                ligne('Statut', ticket.statut === 'ouvert' ? 'Ouvert' : 'Clos')
+            ]),
+            bloc('Requérant', [
+                ligne('Membre', `<@${ticket.auteurId}>`),
+                ligne('Identifiant', code(ticket.auteurId)),
+                ligne('Grade', ticket.grade),
+                ligne('Ouverture', horodatageComplet(new Date(ticket.ouvertLe)))
+            ]),
+            bloc('Gestion', [
+                ligne('Priorité', `${prioriteInfo.nom} — ${prioriteInfo.description}`),
+                ligne('Pris en charge par', ticket.priseEnChargePar ? `<@${ticket.priseEnChargePar}>` : 'Personne'),
+                ligne('Membres ajoutés', membresAjoutes)
+            ]),
+            bloc('Objet', [tronquer(ticket.objet, 900)]),
+            bloc('Exposé de la demande', [tronquer(ticket.motif, 1000)])
+        ],
+        pied: `Division Vanguard — Ticket ${ticket.reference}`
+    });
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+async function transfererTicket(interaction, membre) {
+    const ticket = verifierTicketActif(interaction);
+
+    if (!peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
+        throw new Error("Vous n'êtes pas habilité à transférer ce ticket.");
+    }
+
+    if (membre.id === ticket.auteurId) {
+        throw new Error("Impossible de transférer le ticket au requérant.");
+    }
+
+    const ancienProprietaire = ticket.auteurId;
+    ticket.auteurId = membre.id;
+    ticket.auteurNom = membre.user.username;
+    ticket.grade = gradeLePlusEleve(membre);
+
+    try {
+        await interaction.channel.permissionOverwrites.edit(membre.id, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true,
+            AttachFiles: true
+        });
+
+        await interaction.channel.permissionOverwrites.edit(ancienProprietaire, {
+            ViewChannel: false
+        });
+    } catch (erreur) {
+        throw new Error(`Impossible de transférer le ticket : ${erreur.message}`);
+    }
+
+    const donnees = charger();
+    donnees.actifs[interaction.channel.id] = ticket;
+    sauvegarder(donnees);
+
+    const embed = construireEmbed(interaction.guild, {
+        service: 'Division Vanguard — Gestion de ticket',
+        titre: 'TRANSFERT DE TICKET',
+        couleur: COULEURS.information,
+        description: `Le ticket ${code(ticket.reference)} a été transféré à ${membre}.`,
+        champs: [
+            bloc('Détails', [
+                ligne('Ancien requérant', `<@${ancienProprietaire}>`),
+                ligne('Nouveau requérant', `${membre} (${membre.id})`),
+                ligne('Grade', ticket.grade),
+                ligne('Responsable du transfert', interaction.user.username),
+                ligne('Horodatage', horodatageComplet(new Date()))
+            ])
+        ],
+        pied: `Division Vanguard — Ticket ${ticket.reference}`
+    });
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+// ============================================================================
+// CLÔTURE
+// ============================================================================
 
 async function construireTranscription(channel, ticket) {
     const lignes = [
@@ -466,6 +832,7 @@ async function construireTranscription(channel, ticket) {
         `Référence        : ${ticket.reference}`,
         `Service          : ${libelleType(ticket.type)}`,
         `Destinataire     : ${libelleDestinataire(ticket.type, ticket.categorie)}`,
+        `Priorité         : ${PRIORITES[ticket.priorite].nom}`,
         `Requérant        : ${ticket.auteurNom} (${ticket.auteurId})`,
         `Grade            : ${ticket.grade}`,
         `Objet            : ${ticket.objet}`,
@@ -516,66 +883,28 @@ async function construireTranscription(channel, ticket) {
     });
 }
 
-async function demanderCloture(interaction) {
-    const donnees = charger();
-    const ticket = donnees.actifs[interaction.channel.id];
-
-    if (!ticket) {
-        return interaction.reply({ content: "Ce salon n'est pas répertorié comme un ticket actif.", ephemeral: true });
-    }
-
-    const estAuteur = ticket.auteurId === interaction.user.id;
-    if (!estAuteur && !peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
-        return interaction.reply({
-            content: 'Seuls le requérant et l\'encadrement habilité peuvent clôturer ce dossier.',
-            ephemeral: true
-        });
-    }
-
-    const confirmation = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('dv:ticket:cloture:confirmer')
-            .setLabel('Confirmer la clôture')
-            .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-            .setCustomId('dv:ticket:cloture:annuler')
-            .setLabel('Annuler')
-            .setStyle(ButtonStyle.Secondary)
-    );
-
-    return interaction.reply({
-        content: `La clôture du ticket ${ticket.reference} entraîne l\'archivage de la transcription puis la suppression du salon. Confirmez-vous cette opération ?`,
-        components: [confirmation],
-        ephemeral: true
-    });
-}
-
 async function cloturerTicket(interaction) {
     const channel = interaction.channel;
-    const donnees = charger();
-    const ticket = donnees.actifs[channel.id];
+    const ticket = obtenirTicketActuel(channel.id);
 
     if (!ticket) {
-        return interaction.update({ content: 'Ce dossier est déjà clôturé.', components: [] });
+        throw new Error("Ce salon n'est pas un ticket actif.");
     }
 
     if (verrousCloture.has(channel.id)) {
-        return interaction.update({ content: 'La clôture de ce dossier est déjà en cours.', components: [] });
+        throw new Error("La clôture de ce dossier est déjà en cours.");
     }
 
     const estAuteur = ticket.auteurId === interaction.user.id;
     if (!estAuteur && !peutGererTicket(interaction.member, ticket.type, ticket.categorie)) {
-        return interaction.update({
-            content: "Vous n'êtes pas habilité à clôturer ce dossier.",
-            components: []
-        });
+        throw new Error("Vous n'êtes pas habilité à clôturer ce dossier.");
     }
 
     verrousCloture.add(channel.id);
-    await interaction.update({ content: 'Archivage de la transcription en cours.', components: [] });
 
     const transcription = await construireTranscription(channel, ticket).catch(() => null);
     const clotureLe = new Date();
+    const prioriteInfo = PRIORITES[ticket.priorite];
 
     const bilan = construireEmbed(interaction.guild, {
         service: 'Division Vanguard — Archive des tickets',
@@ -586,6 +915,7 @@ async function cloturerTicket(interaction) {
                 ligne('Référence', code(ticket.reference)),
                 ligne('Service', libelleType(ticket.type)),
                 ligne('Destinataire', libelleDestinataire(ticket.type, ticket.categorie)),
+                ligne('Priorité finale', prioriteInfo.nom),
                 ligne('Objet', tronquer(ticket.objet, 300))
             ]),
             bloc('Requérant', [
@@ -616,6 +946,7 @@ async function cloturerTicket(interaction) {
         }).catch(() => null);
     }
 
+    const donnees = charger();
     delete donnees.actifs[channel.id];
     donnees.archives.unshift({
         ...ticket,
@@ -637,7 +968,17 @@ async function cloturerTicket(interaction) {
         });
         verrousCloture.delete(channel.id);
     }, config.tickets.delaiSuppression * 1000);
+
+    if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: 'Ticket clôturé avec succès.' });
+    } else {
+        await interaction.reply({ content: 'Ticket clôturé avec succès.', flags: MessageFlags.Ephemeral });
+    }
 }
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
 module.exports = {
     charger,
@@ -647,7 +988,14 @@ module.exports = {
     construireFormulaire,
     creerTicket,
     prendreEnCharge,
-    demanderCloture,
+    relacherPriseEnCharge,
     cloturerTicket,
-    ticketOuvertPar
+    renommerTicket,
+    changerPriorite,
+    ajouterMembre,
+    retirerMembre,
+    afficherInfoTicket,
+    transfererTicket,
+    ticketOuvertPar,
+    obtenirTicketActuel
 };
