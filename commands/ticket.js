@@ -57,7 +57,7 @@ module.exports = {
         
         // Sous-commande : Relâcher la prise en charge
         .addSubcommand(sub =>
-            sub.setName('relâcher')
+            sub.setName('relacher')
                .setDescription('Relâcher la prise en charge du ticket actuel')
         )
         
@@ -76,7 +76,7 @@ module.exports = {
         
         // Sous-commande : Changer la priorité
         .addSubcommand(sub =>
-            sub.setName('priorité')
+            sub.setName('priorite')
                .setDescription('Changer le niveau de priorité du ticket')
                .addStringOption(opt =>
                    opt.setName('niveau')
@@ -121,7 +121,7 @@ module.exports = {
         
         // Sous-commande : Transférer le ticket
         .addSubcommand(sub =>
-            sub.setName('transférer')
+            sub.setName('transferer')
                .setDescription('Transférer le ticket à un autre membre')
                .addUserOption(opt =>
                    opt.setName('membre')
@@ -141,11 +141,11 @@ module.exports = {
                     return await gererFermer(interaction);
                 case 'prendre':
                     return await gererPrendre(interaction);
-                case 'relâcher':
+                case 'relacher':
                     return await gererRelacher(interaction);
                 case 'renommer':
                     return await gererRenommer(interaction);
-                case 'priorité':
+                case 'priorite':
                     return await gererPriorite(interaction);
                 case 'ajouter':
                     return await gererAjouter(interaction);
@@ -153,7 +153,7 @@ module.exports = {
                     return await gererRetirer(interaction);
                 case 'info':
                     return await gererInfo(interaction);
-                case 'transférer':
+                case 'transferer':
                     return await gererTransferer(interaction);
                 default:
                     return interaction.reply({
