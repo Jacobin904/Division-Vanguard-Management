@@ -6,21 +6,19 @@ const { collectServerInfo } = require('../utils/serverCollector');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('serverinfo')
-        .setDescription('Récupère absolument toutes les infos du serveur (admin uniquement)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        .setDescription('Genere un rapport complet du serveur avec toutes les permissions (admin uniquement)')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDMPermission(false),
 
     async execute(interaction) {
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
             return interaction.reply({
-                content: '[ERREUR] Tu dois avoir la permission **Administrateur** pour utiliser cette commande.',
+                content: '[ERREUR] Tu dois avoir la permission Administrateur pour utiliser cette commande.',
                 flags: MessageFlags.Ephemeral
             });
         }
 
-        await interaction.reply({
-            content: '[INFO] Collecte des données en cours. Envoi du rapport complet en message privé...',
-            flags: MessageFlags.Ephemeral
-        });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const { embed, attachment } = collectServerInfo(interaction.guild);
 
@@ -31,13 +29,14 @@ module.exports = {
             });
 
             await interaction.editReply({
-                content: '[SUCCÈS] Le rapport complet avec tous les IDs a été envoyé dans tes messages privés.'
+                content: '[SUCCES] Le rapport complet du serveur (incluant toutes les permissions des roles et salons) a ete envoye dans tes messages prives.'
             });
         } catch (error) {
-            console.warn(`Impossible d'envoyer un DM à ${interaction.user.tag}`);
+            console.warn(`Impossible d'envoyer un DM a ${interaction.user.tag}`);
             await interaction.editReply({
-                content: '[ERREUR] Tes messages privés sont fermés. Impossible de t\'envoyer le rapport.',
-                flags: MessageFlags.Ephemeral
+                embeds: [embed],
+                files: [attachment],
+                content: '[INFO] Tes messages prives sont fermes. Le rapport est envoye ici.'
             });
         }
     }
