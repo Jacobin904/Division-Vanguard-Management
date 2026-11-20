@@ -1,3 +1,5 @@
+'use strict';
+
 const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { collectServerInfo } = require('../utils/serverCollector');
 
@@ -8,7 +10,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
-        // Double vérification des permissions
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
             return interaction.reply({
                 content: '[ERREUR] Tu dois avoir la permission **Administrateur** pour utiliser cette commande.',
