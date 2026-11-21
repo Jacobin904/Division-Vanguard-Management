@@ -22,9 +22,6 @@ server.listen(PORT, () => {
     console.log(`[HTTP] Serveur de health check actif sur le port ${PORT}`);
 });
 
-// Garder le serveur actif
-server.keepAlive = true;
-
 // ============================================================================
 // CLIENT DISCORD
 // ============================================================================
@@ -129,61 +126,18 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // ============================================================================
-// ARRÊT PROPRE - IGNORE LES SIGTERM DE RENDER
+// IGNORER COMPLÈTEMENT LES SIGNAUX SIGTERM DE RENDER
 // ============================================================================
 
-let isShuttingDown = false;
-let lastSigterm = 0;
-
-function gracefulShutdown(signal) {
-    const now = Date.now();
-    
-    // Si on reçoit un SIGTERM dans les 5 dernières secondes, c'est probablement Render qui redémarre
-    // On ignore pour éviter les redémarrages en boucle
-    if (signal === 'SIGTERM' && (now - lastSigterm) < 5000) {
-        console.log('[ARRÊT] SIGTERM ignoré (redémarrage Render détecté)');
-        return;
-    }
-    
-    lastSigterm = now;
-    
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    
-    console.log(`[ARRÊT] Signal ${signal} reçu. Arrêt propre en cours...`);
-    
-    // Fermer le serveur HTTP
-    server.close(() => {
-        console.log('[HTTP] Serveur fermé.');
-    });
-    
-    // Déconnecter le client Discord
-    if (client.isReady()) {
-        client.destroy().then(() => {
-            console.log('[DISCORD] Client déconnecté proprement.');
-            process.exit(0);
-        }).catch((err) => {
-            console.error('[DISCORD] Erreur lors de la déconnexion :', err);
-            process.exit(1);
-        });
-    } else {
-        process.exit(0);
-    }
-    
-    // Timeout de sécurité
-    setTimeout(() => {
-        console.error('[ARRÊT] Timeout atteint, arrêt forcé.');
-        process.exit(1);
-    }, 10000);
-}
-
-// Ne pas réagir aux SIGTERM de Render
 process.on('SIGTERM', () => {
-    console.log('[SIGTERM] Signal reçu, mais ignoré pour maintenir le bot en ligne');
-    // Ne pas appeler gracefulShutdown
+    console.log('[SIGTERM] Signal reçu de Render, mais ignoré pour maintenir le bot en ligne');
+    // Ne rien faire, ignorer complètement le signal
 });
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGINT', () => {
+    console.log('[SIGINT] Signal reçu, mais ignoré pour maintenir le bot en ligne');
+    // Ne rien faire, ignorer complètement le signal
+});
 
 // ============================================================================
 // CONNEXION À DISCORD
