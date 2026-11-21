@@ -8,7 +8,7 @@ const clientStatus = require('./events/clientStatus');
 const http = require('http');
 
 // ============================================================================
-// SERVEUR HTTP MINIMAL POUR LE HEALTH CHECK DE RENDER
+// SERVEUR HTTP POUR HEALTH CHECK RENDER
 // ============================================================================
 
 const PORT = process.env.PORT || 3000;
@@ -124,12 +124,10 @@ client.on(Events.ShardReady, () => {
 
 process.on('uncaughtException', (error) => {
     console.error('[ERREUR NON CAPTURÉE]', error);
-    // Ne pas exit, juste logger
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('[PROMESSE REJETÉE]', reason);
-    // Ne pas exit, juste logger
 });
 
 // ============================================================================
