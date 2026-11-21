@@ -124,10 +124,12 @@ client.on(Events.ShardReady, () => {
 
 process.on('uncaughtException', (error) => {
     console.error('[ERREUR NON CAPTURÉE]', error);
+    // Ne pas exit, juste logger
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('[PROMESSE REJETÉE]', reason);
+    // Ne pas exit, juste logger
 });
 
 // ============================================================================
