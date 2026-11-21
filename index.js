@@ -1,25 +1,36 @@
 'use strict';
 
-const { Client, Collection, GatewayIntentBits, Partials, Events } = require('discord.js');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const {
+    Client,
+    Collection,
+    GatewayIntentBits,
+    Partials,
+    Events
+} = require('discord.js');
+
 const config = require('./config');
 const clientStatus = require('./events/clientStatus');
-const http = require('http');
 
 // ============================================================================
-// SERVEUR HTTP POUR HEALTH CHECK RENDER
+// SONDE HTTP POUR L'HÉBERGEUR
 // ============================================================================
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
+const serveur = http.createServer((requete, reponse) => {
+    reponse.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    reponse.end('OK');
 });
 
-server.listen(PORT, () => {
-    console.log(`[HTTP] Serveur de health check actif sur le port ${PORT}`);
+serveur.listen(PORT, () => {
+    console.log(`[HTTP] Sonde de disponibilité active sur le port ${PORT}.`);
+});
+
+serveur.on('error', (erreur) => {
+    console.error(`[HTTP] Erreur du serveur : ${erreur.message}`);
 });
 
 // ============================================================================
@@ -30,20 +41,21 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildModeration,
         GatewayIntentBits.GuildEmojisAndStickers,
         GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildModeration,
         GatewayIntentBits.GuildPresences,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ],
     partials: [Partials.Channel, Partials.GuildMember, Partials.User],
     ws: {
-        large_threshold: 250,
-        version: 10
+        large_threshold: 250
     },
-    closeTimeout: 15000,
-    retryLimit: Infinity
+    rest: {
+        timeout: 30000,
+        retries: 3
+    }
 });
 
 client.commands = new Collection();
@@ -52,20 +64,21 @@ client.commands = new Collection();
 // CHARGEMENT DES COMMANDES
 // ============================================================================
 
-const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const dossierCommandes = path.join(__dirname, 'commands');
 
-for (const file of commandFiles) {
+for (const fichier of fs.readdirSync(dossierCommandes).filter((f) => f.endsWith('.js'))) {
     try {
-        const command = require(path.join(commandsPath, file));
-        if ('data' in command && 'execute' in command) {
-            client.commands.set(command.data.name, command);
-            console.log(`[CMD] Commande chargée : ${command.data.name}`);
-        } else {
-            console.warn(`[CMD] La commande ${file} manque data ou execute`);
+        const commande = require(path.join(dossierCommandes, fichier));
+
+        if (!commande?.data || !commande?.execute) {
+            console.warn(`[COMMANDE] ${fichier} ignoré : structure invalide.`);
+            continue;
         }
-    } catch (error) {
-        console.error(`[CMD] Erreur chargement ${file} :`, error);
+
+        client.commands.set(commande.data.name, commande);
+        console.log(`[COMMANDE] ${commande.data.name} chargée.`);
+    } catch (erreur) {
+        console.error(`[COMMANDE] Échec du chargement de ${fichier} : ${erreur.message}`);
     }
 }
 
@@ -73,99 +86,86 @@ for (const file of commandFiles) {
 // CHARGEMENT DES ÉVÉNEMENTS
 // ============================================================================
 
-const eventsPath = path.join(__dirname, 'events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file => 
-    file.endsWith('.js') && file !== 'clientStatus.js'
-);
+const dossierEvenements = path.join(__dirname, 'events');
 
-for (const file of eventFiles) {
+for (const fichier of fs.readdirSync(dossierEvenements).filter((f) => f.endsWith('.js') && f !== 'clientStatus.js')) {
     try {
-        const event = require(path.join(eventsPath, file));
-        if (event.once) {
-            client.once(event.name, (...args) => event.execute(...args, client));
-        } else {
-            client.on(event.name, (...args) => event.execute(...args, client));
+        const evenement = require(path.join(dossierEvenements, fichier));
+
+        if (!evenement?.name || !evenement?.execute) {
+            console.warn(`[ÉVÉNEMENT] ${fichier} ignoré : structure invalide.`);
+            continue;
         }
-        console.log(`[EVENT] Événement chargé : ${event.name}`);
-    } catch (error) {
-        console.error(`[EVENT] Erreur chargement ${file} :`, error);
+
+        if (evenement.once) {
+            client.once(evenement.name, (...args) => evenement.execute(...args, client));
+        } else {
+            client.on(evenement.name, (...args) => evenement.execute(...args, client));
+        }
+
+        console.log(`[ÉVÉNEMENT] ${evenement.name} chargé.`);
+    } catch (erreur) {
+        console.error(`[ÉVÉNEMENT] Échec du chargement de ${fichier} : ${erreur.message}`);
     }
 }
 
-// Enregistrement des gestionnaires de statut WebSocket
 clientStatus.registerAll(client);
 
 // ============================================================================
-// GESTIONNAIRE DE CONNEXION/RECONNEXION
+// PROTECTION CONTRE LES ARRÊTS INVOLONTAIRES
 // ============================================================================
 
-let reconnectAttempts = 0;
-const MAX_RECONNECT_DELAY = 60000;
-
-client.on(Events.ShardDisconnect, () => {
-    reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
-    console.log(`[RECONNECT] Tentative ${reconnectAttempts}. Prochain essai dans ${delay}ms.`);
+process.on('uncaughtException', (erreur) => {
+    console.error(`[ERREUR] Exception non interceptée : ${erreur.stack || erreur.message}`);
 });
 
-client.on(Events.ShardReady, () => {
-    reconnectAttempts = 0;
-    console.log('[RECONNECT] Compteur de tentatives réinitialisé.');
+process.on('unhandledRejection', (raison) => {
+    const message = raison instanceof Error ? raison.stack || raison.message : String(raison);
+    console.error(`[ERREUR] Promesse rejetée non traitée : ${message}`);
 });
-
-// ============================================================================
-// GESTION DES ERREURS GLOBALES
-// ============================================================================
-
-process.on('uncaughtException', (error) => {
-    console.error('[ERREUR NON CAPTURÉE]', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('[PROMESSE REJETÉE]', reason);
-});
-
-// ============================================================================
-// IGNORER COMPLÈTEMENT LES SIGNAUX SIGTERM DE RENDER
-// ============================================================================
 
 process.on('SIGTERM', () => {
-    console.log('[SIGTERM] Signal reçu de Render, mais ignoré pour maintenir le bot en ligne');
-    // Ne rien faire, ignorer complètement le signal
+    console.log('[SIGNAL] SIGTERM reçu et ignoré. Le service demeure actif.');
 });
 
 process.on('SIGINT', () => {
-    console.log('[SIGINT] Signal reçu, mais ignoré pour maintenir le bot en ligne');
-    // Ne rien faire, ignorer complètement le signal
+    console.log('[SIGNAL] SIGINT reçu et ignoré. Le service demeure actif.');
 });
 
 // ============================================================================
 // CONNEXION À DISCORD
 // ============================================================================
 
-async function loginWithRetry() {
+let tentatives = 0;
+
+async function connecter() {
     try {
         await client.login(config.token);
-        console.log('[DISCORD] Connexion réussie.');
-    } catch (error) {
-        console.error('[DISCORD] Erreur de connexion :', error.message);
-        console.log('[DISCORD] Nouvelle tentative dans 10 secondes...');
-        setTimeout(loginWithRetry, 10000);
+        tentatives = 0;
+    } catch (erreur) {
+        tentatives += 1;
+        const delai = Math.min(10000 * tentatives, 120000);
+
+        console.error(`[AUTHENTIFICATION] Échec de la connexion : ${erreur.message}`);
+        console.log(`[AUTHENTIFICATION] Nouvelle tentative dans ${delai / 1000} secondes.`);
+
+        setTimeout(connecter, delai);
     }
 }
 
-loginWithRetry();
+connecter();
 
 // ============================================================================
-// KEEP-ALIVE : PING RÉGULIER POUR GARDER LE PROCESSUS ACTIF
+// SURVEILLANCE DE L'ÉTAT DE LA SESSION
 // ============================================================================
 
 setInterval(() => {
-    if (client.isReady()) {
-        console.log(`[KEEP-ALIVE] Bot actif - Ping: ${client.ws.ping}ms`);
+    if (!client.isReady()) {
+        console.warn('[SURVEILLANCE] Session Discord indisponible. Tentative de rétablissement.');
+        connecter().catch(() => {});
     }
-}, 300000); // Toutes les 5 minutes
+}, 120000);
 
 process.on('exit', (code) => {
-    console.log(`[PROCESS] Processus terminé avec le code ${code}.`);
+    console.log(`[PROCESSUS] Arrêt avec le code ${code}.`);
 });
