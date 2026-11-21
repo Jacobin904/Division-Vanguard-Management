@@ -10,17 +10,14 @@ const {
 const config = require('../config/guildConfig');
 
 const SALON_VOCAL_GENERAL = '1502321987056566412';
-const DELAI_RECONNEXION_BASE = 10000; // 10 secondes
-const DELAI_RECONNEXION_MAX = 60000;  // 60 secondes maximum
+const DELAI_RECONNEXION_BASE = 10000;
+const DELAI_RECONNEXION_MAX = 60000;
 
 let connection = null;
 let tentativeReconnexion = 0;
 let surveillanceActive = false;
 let enCoursDeConnexion = false;
 
-/**
- * Connecte le bot au salon vocal général avec gestion d'erreurs robuste
- */
 async function connecterAuVocal(guild) {
     if (enCoursDeConnexion) {
         console.log('[VOICE] Connexion déjà en cours, skip.');
@@ -44,7 +41,6 @@ async function connecterAuVocal(guild) {
             return false;
         }
 
-        // Vérifier si déjà connecté
         const connexionExistante = getVoiceConnection(guild.id);
         if (connexionExistante && connexionExistante.state.status !== VoiceConnectionStatus.Destroyed) {
             console.log('[VOICE] Déjà connecté au salon vocal.');
@@ -63,13 +59,11 @@ async function connecterAuVocal(guild) {
             selfMute: true
         });
 
-        // Attendre que la connexion soit prête avec timeout plus long
         await entersState(connection, VoiceConnectionStatus.Ready, 30000);
         
         console.log('[VOICE] Connecté avec succès au salon vocal général.');
         tentativeReconnexion = 0;
         
-        // Configurer les gestionnaires d'événements
         configurerGestionnaires(guild);
         
         enCoursDeConnexion = false;
@@ -92,9 +86,6 @@ async function connecterAuVocal(guild) {
     }
 }
 
-/**
- * Configure les gestionnaires d'événements pour la connexion vocale
- */
 function configurerGestionnaires(guild) {
     if (!connection) return;
 
@@ -102,7 +93,6 @@ function configurerGestionnaires(guild) {
         console.log('[VOICE] Déconnecté du salon vocal.');
         
         try {
-            // Tenter de se reconnecter avec timeout plus court
             await Promise.race([
                 entersState(connection, VoiceConnectionStatus.Signalling, 5000),
                 entersState(connection, VoiceConnectionStatus.Connecting, 5000)
@@ -117,7 +107,6 @@ function configurerGestionnaires(guild) {
             }
             connection = null;
             
-            // Planifier une reconnexion complète
             planifierReconnexion(guild);
         }
     });
@@ -140,13 +129,9 @@ function configurerGestionnaires(guild) {
 
     connection.on('error', (erreur) => {
         console.error('[VOICE] Erreur de connexion vocale :', erreur.message);
-        // Ne pas crasher, juste logger l'erreur
     });
 }
 
-/**
- * Planifie une tentative de reconnexion avec délai exponentiel
- */
 function planifierReconnexion(guild) {
     const delai = Math.min(
         DELAI_RECONNEXION_BASE * Math.pow(2, tentativeReconnexion),
@@ -161,9 +146,6 @@ function planifierReconnexion(guild) {
     }, delai);
 }
 
-/**
- * Vérifie périodiquement que le bot est bien connecté
- */
 function demarrerSurveillance(client) {
     if (surveillanceActive) return;
     
@@ -180,12 +162,9 @@ function demarrerSurveillance(client) {
             console.log('[VOICE] Connexion vocale inactive, reconnexion automatique...');
             await connecterAuVocal(guild);
         }
-    }, 60000); // Vérification toutes les minutes
+    }, 60000);
 }
 
-/**
- * Déconnecte le bot du salon vocal
- */
 function deconnecter() {
     if (connection) {
         try {
