@@ -1,10 +1,10 @@
 {
   "name": "division-vanguard-management",
   "version": "1.0.0",
-  "description": "Bot de gestion pour Division Vanguard",
-  "main": "index.js",
+  "description": "Bot et portail web de gestion pour Division Vanguard",
+  "main": "server.js",
   "scripts": {
-    "start": "node deploy-commands.js && node index.js",
+    "start": "node server.js",
     "deploy": "node deploy-commands.js"
   },
   "dependencies": {
@@ -12,7 +12,12 @@
     "dotenv": "^16.4.5",
     "@discordjs/voice": "^0.16.1",
     "opusscript": "^0.0.8",
-    "tweetnacl": "^1.0.3"
+    "tweetnacl": "^1.0.3",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "passport": "^0.7.0",
+    "passport-discord": "^0.1.4",
+    "node-fetch": "^2.7.0"
   },
   "engines": {
     "node": ">=18.0.0"
