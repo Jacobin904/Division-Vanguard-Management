@@ -10,16 +10,24 @@ const {
 const config = require('../config/guildConfig');
 
 const SALON_VOCAL_GENERAL = '1502321987056566412';
-const DELAI_RECONNEXION_BASE = 15000;
-const DELAI_RECONNEXION_MAX = 120000;
+const DELAI_RECONNEXION = 300000; // 5 minutes entre les tentatives
+const MAX_TENTATIVES_CONSECUTIVES = 3;
 
 let connection = null;
 let tentativeReconnexion = 0;
 let surveillanceActive = false;
 let enCoursDeConnexion = false;
-let connexionReussie = false;
+let derniereTentativeEchec = 0;
 
 async function connecterAuVocal(guild) {
+    const maintenant = Date.now();
+    
+    // Éviter les tentatives trop rapprochées
+    if (maintenant - derniereTentativeEchec < DELAI_RECONNEXION) {
+        console.log('[VOCAL] Trop tôt pour une nouvelle tentative. Attente de 5 minutes.');
+        return false;
+    }
+
     if (enCoursDeConnexion) {
         console.log('[VOCAL] Connexion déjà en cours, skip.');
         return false;
@@ -33,12 +41,14 @@ async function connecterAuVocal(guild) {
         if (!salonVocal) {
             console.error('[VOCAL] Le salon vocal général est introuvable.');
             enCoursDeConnexion = false;
+            derniereTentativeEchec = maintenant;
             return false;
         }
 
         if (salonVocal.type !== 2) {
             console.error('[VOCAL] Le salon spécifié n\'est pas un salon vocal.');
             enCoursDeConnexion = false;
+            derniereTentativeEchec = maintenant;
             return false;
         }
 
@@ -46,8 +56,8 @@ async function connecterAuVocal(guild) {
         if (connexionExistante && connexionExistante.state.status !== VoiceConnectionStatus.Destroyed) {
             console.log('[VOCAL] Déjà connecté au salon vocal.');
             connection = connexionExistante;
-            connexionReussie = true;
             enCoursDeConnexion = false;
+            tentativeReconnexion = 0;
             return true;
         }
 
@@ -65,11 +75,10 @@ async function connecterAuVocal(guild) {
         
         console.log('[VOCAL] Connecté avec succès au salon vocal général.');
         tentativeReconnexion = 0;
-        connexionReussie = true;
+        enCoursDeConnexion = false;
         
         configurerGestionnaires(guild);
         
-        enCoursDeConnexion = false;
         return true;
 
     } catch (erreur) {
@@ -85,6 +94,16 @@ async function connecterAuVocal(guild) {
         }
         
         enCoursDeConnexion = false;
+        derniereTentativeEchec = maintenant;
+        tentativeReconnexion++;
+        
+        if (tentativeReconnexion >= MAX_TENTATIVES_CONSECUTIVES) {
+            console.error(`[VOCAL] ${MAX_TENTATIVES_CONSECUTIVES} tentatives échouées consécutivement. Arrêt des tentatives automatiques.`);
+            console.error('[VOCAL] Le bot restera hors du salon vocal. Redémarrez le bot pour réessayer.');
+        } else {
+            console.log(`[VOCAL] Tentative ${tentativeReconnexion}/${MAX_TENTATIVES_CONSECUTIVES}. Prochaine tentative dans 5 minutes.`);
+        }
+        
         return false;
     }
 }
@@ -93,8 +112,7 @@ function configurerGestionnaires(guild) {
     if (!connection) return;
 
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
-        console.log('[VOCAL] Déconnecté du salon vocal. Tentative de reconnexion...');
-        connexionReussie = false;
+        console.log('[VOCAL] Déconnecté du salon vocal.');
         
         try {
             await Promise.race([
@@ -111,15 +129,20 @@ function configurerGestionnaires(guild) {
             }
             connection = null;
             
-            planifierReconnexion(guild);
+            // Planifier une reconnexion après 5 minutes
+            setTimeout(async () => {
+                await connecterAuVocal(guild);
+            }, DELAI_RECONNEXION);
         }
     });
 
     connection.on(VoiceConnectionStatus.Destroyed, () => {
         console.log('[VOCAL] Connexion vocale détruite.');
         connection = null;
-        connexionReussie = false;
-        planifierReconnexion(guild);
+        
+        setTimeout(async () => {
+            await connecterAuVocal(guild);
+        }, DELAI_RECONNEXION);
     });
 
     connection.on(VoiceConnectionStatus.Connecting, () => {
@@ -129,26 +152,11 @@ function configurerGestionnaires(guild) {
     connection.on(VoiceConnectionStatus.Ready, () => {
         console.log('[VOCAL] Connexion vocale active.');
         tentativeReconnexion = 0;
-        connexionReussie = true;
     });
 
     connection.on('error', (erreur) => {
         console.error('[VOCAL] Erreur de connexion vocale :', erreur.message);
     });
-}
-
-function planifierReconnexion(guild) {
-    const delai = Math.min(
-        DELAI_RECONNEXION_BASE * Math.pow(1.5, tentativeReconnexion),
-        DELAI_RECONNEXION_MAX
-    );
-    
-    tentativeReconnexion++;
-    console.log(`[VOCAL] Tentative de reconnexion ${tentativeReconnexion} dans ${Math.round(delai / 1000)} secondes...`);
-
-    setTimeout(async () => {
-        await connecterAuVocal(guild);
-    }, delai);
 }
 
 function demarrerSurveillance(client) {
@@ -164,17 +172,10 @@ function demarrerSurveillance(client) {
         const connexionActuelle = getVoiceConnection(guild.id);
         
         if (!connexionActuelle || connexionActuelle.state.status === VoiceConnectionStatus.Destroyed) {
-            if (connexionReussie) {
-                console.log('[VOCAL] Connexion vocale perdue, reconnexion automatique...');
-                connexionReussie = false;
-            }
+            console.log('[VOCAL] Connexion vocale inactive, tentative de reconnexion...');
             await connecterAuVocal(guild);
-        } else if (!connexionReussie && connexionActuelle.state.status === VoiceConnectionStatus.Ready) {
-            console.log('[VOCAL] Connexion vocale rétablie.');
-            connexionReussie = true;
-            tentativeReconnexion = 0;
         }
-    }, 30000);
+    }, 300000); // Vérification toutes les 5 minutes
 }
 
 function deconnecter() {
