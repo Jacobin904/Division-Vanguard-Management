@@ -1,107 +1,73 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de Bord - Division Vanguard</title>
-    <style>
-        body { background-color: #1a1a1a; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
-        header { background-color: #2b3a55; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #34568b; }
-        header h1 { margin: 0; font-size: 24px; color: #ffffff; letter-spacing: 1px; }
-        .logout-btn { background-color: #c0392b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; transition: background 0.3s; }
-        .logout-btn:hover { background-color: #e74c3c; }
-        
-        .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 2fr; gap: 30px; }
-        
-        .card { background-color: #2b2b2b; padding: 25px; border-radius: 8px; border-left: 4px solid #34568b; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .card h2 { margin-top: 0; color: #ffffff; font-size: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 20px; }
-        
-        .profile-section { text-align: center; }
-        .avatar { width: 120px; height: 120px; border-radius: 50%; border: 3px solid #34568b; margin-bottom: 15px; background-color: #222; }
-        .username { font-size: 22px; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
-        .discriminator { color: #888; font-size: 16px; }
-        
-        .roles-list { list-style: none; padding: 0; margin: 0; }
-        .role-item { display: inline-block; padding: 6px 12px; margin: 4px; border-radius: 4px; background-color: #333; font-size: 14px; font-weight: 500; border: 1px solid #444; }
-        
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-        .stat-box { background-color: #222; padding: 15px; border-radius: 6px; text-align: center; }
-        .stat-value { font-size: 28px; font-weight: bold; color: #3498db; }
-        .stat-label { font-size: 14px; color: #aaa; margin-top: 5px; }
-        
-        .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #333; }
-        .info-row:last-child { border-bottom: none; }
-        .info-label { color: #aaa; }
-        .info-value { color: #fff; font-weight: 500; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tableau de bord — Division Vanguard</title>
+<style>
+:root { --fond:#14161a; --carte:#1e2126; --bord:#2c3138; --accent:#2b3a55; --accent2:#34568b; --texte:#e6e8ea; --sourd:#8b929b; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--fond); color:var(--texte); font-family:'Segoe UI',system-ui,sans-serif; }
+header { background:var(--accent); padding:18px 32px; display:flex; justify-content:space-between; align-items:center; }
+header h1 { margin:0; font-size:17px; letter-spacing:1.5px; text-transform:uppercase; }
+.sortie { background:#8b1a1a; color:#fff; padding:9px 18px; border-radius:4px; text-decoration:none; font-size:14px; font-weight:600; }
+.grille { max-width:1150px; margin:32px auto; padding:0 20px; display:grid; grid-template-columns:320px 1fr; gap:24px; }
+@media (max-width:860px) { .grille { grid-template-columns:1fr; } }
+.carte { background:var(--carte); border:1px solid var(--bord); border-left:3px solid var(--accent2); border-radius:6px; padding:24px; }
+.carte h2 { margin:0 0 18px; font-size:14px; letter-spacing:1.2px; text-transform:uppercase; color:var(--sourd); }
+.profil { text-align:center; }
+.avatar { width:110px; height:110px; border-radius:50%; border:2px solid var(--accent2); }
+.nom { margin-top:14px; font-size:19px; font-weight:600; }
+.ident { color:var(--sourd); font-size:12px; margin-top:4px; word-break:break-all; }
+.roles { margin-top:22px; text-align:left; }
+.role { display:inline-block; padding:5px 10px; margin:3px 3px 3px 0; border-radius:3px;
+        background:#15181c; border-left:3px solid #444; font-size:12px; }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.stat { background:#15181c; border:1px solid var(--bord); border-radius:5px; padding:16px; text-align:center; }
+.stat b { display:block; font-size:24px; color:var(--accent2); }
+.stat span { font-size:11px; color:var(--sourd); text-transform:uppercase; letter-spacing:1px; }
+.ligne { display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--bord); font-size:14px; }
+.ligne:last-child { border-bottom:none; }
+.ligne span:first-child { color:var(--sourd); }
+.ok { color:#3ea55f; font-weight:600; }
+</style>
 </head>
 <body>
-    <header>
-        <h1>DIVISION VANGUARD — PORTAIL INTERNE</h1>
-        <a href="/logout" class="logout-btn">Déconnexion</a>
-    </header>
+<header>
+    <h1>Division Vanguard — Portail interne</h1>
+    <a class="sortie" href="/logout">Déconnexion</a>
+</header>
 
-    <div class="container">
-        <!-- Profil Utilisateur -->
-        <div class="card profile-section">
-            <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=256" alt="Avatar" class="avatar">
-            <div class="username"><%= user.username %></div>
-            <div class="discriminator">ID: <%= user.id %></div>
-            
-            <h2 style="margin-top: 30px; text-align: left;">Vos Grades & Rôles</h2>
-            <div style="text-align: left;">
-                <% if (roles.length > 0) { %>
-                    <% roles.forEach(function(role) { %>
-                        <span class="role-item" style="border-color: <%= role.color %>;"><%= role.name %></span>
-                    <% }); %>
-                <% } else { %>
-                    <p style="color: #888;">Aucun rôle assigné.</p>
-                <% } %>
-            </div>
-        </div>
-
-        <!-- Informations Serveur et Accès -->
-        <div>
-            <div class="card">
-                <h2>État du Serveur</h2>
-                <% if (guild) { %>
-                    <div class="stats-grid">
-                        <div class="stat-box">
-                            <div class="stat-value"><%= guild.memberCount %></div>
-                            <div class="stat-label">Membres Totaux</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value">Niveau <%= guild.boostLevel %></div>
-                            <div class="stat-label">Niveau de Boost</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value"><%= guild.boostCount %></div>
-                            <div class="stat-label">Boosts Actifs</div>
-                        </div>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Nom du serveur</span>
-                        <span class="info-value"><%= guild.name %></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Statut du Bot</span>
-                        <span class="info-value" style="color: #2ecc71;">● En ligne et opérationnel</span>
-                    </div>
-                <% } else { %>
-                    <p style="color: #e74c3c;">Impossible de récupérer les données du serveur.</p>
-                <% } %>
-            </div>
-
-            <div class="card" style="margin-top: 30px;">
-                <h2>Actions Rapides</h2>
-                <p style="color: #aaa; margin-bottom: 20px;">Accédez aux outils de gestion et aux ressources de la Division Vanguard.</p>
-                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                    <a href="/reglement" style="background-color: #34568b; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; flex: 1; text-align: center;">Règlement</a>
-                    <a href="/support" style="background-color: #2b2b2b; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; flex: 1; text-align: center; border: 1px solid #444;">Support</a>
-                    <a href="/candidatures" style="background-color: #2b2b2b; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; flex: 1; text-align: center; border: 1px solid #444;">Candidatures</a>
-                </div>
-            </div>
+<div class="grille">
+    <div class="carte profil">
+        <img class="avatar" src="<%= user.avatarURL %>" alt="Avatar">
+        <div class="nom"><%= user.username %></div>
+        <div class="ident"><%= user.id %></div>
+        <div class="roles">
+            <h2>Grades et rôles</h2>
+            <% if (roles.length) { %>
+                <% roles.forEach(function(role) { %>
+                    <span class="role" style="border-left-color:<%= role.color %>;"><%= role.name %></span>
+                <% }); %>
+            <% } else { %>
+                <p style="color:var(--sourd);font-size:13px;">Aucun rôle attribué.</p>
+            <% } %>
         </div>
     </div>
+
+    <div class="carte">
+        <h2>État du serveur</h2>
+        <div class="stats">
+            <div class="stat"><b><%= guild.memberCount %></b><span>Membres</span></div>
+            <div class="stat"><b><%= guild.boostLevel %></b><span>Niveau boost</span></div>
+            <div class="stat"><b><%= guild.boostCount %></b><span>Boosts</span></div>
+        </div>
+        <div style="margin-top:20px;">
+            <div class="ligne"><span>Serveur</span><span><%= guild.name %></span></div>
+            <div class="ligne"><span>Service Discord</span><span class="ok">Opérationnel</span></div>
+            <div class="ligne"><span>Portail web</span><span class="ok">Opérationnel</span></div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
