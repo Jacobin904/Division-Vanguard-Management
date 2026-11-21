@@ -1,62 +1,74 @@
 'use strict';
 
-let client = null;
-let watchdogInterval = null;
-let lastHeartbeat = Date.now();
+const config = require('../config/guildConfig');
 
-function initialize(clientInstance) {
-    client = clientInstance;
-    console.log('[KEEP-ALIVE] Système de surveillance activé.');
+let clientDiscord = null;
+let surveillanceActive = false;
 
-    // Watchdog : vérifie toutes les 60 secondes que le bot est bien connecté
-    watchdogInterval = setInterval(() => {
-        if (!client || !client.ws) {
-            console.warn('[WATCHDOG] Client Discord non disponible.');
-            return;
-        }
-
-        const ping = client.ws.ping;
-        const isConnected = client.ws.status === 0;
-        
-        if (!isConnected) {
-            console.warn(`[WATCHDOG] Bot déconnecté ! Statut WebSocket : ${client.ws.status}. Reconnexion automatique en cours...`);
-        } else {
-            console.log(`[WATCHDOG] Bot en ligne. Ping : ${ping}ms. Mémoire : ${getMemoryUsage()}`);
-        }
-
-        lastHeartbeat = Date.now();
-    }, 60000);
+function consommationMemoire() {
+    const memoire = process.memoryUsage();
+    const utilisee = (memoire.heapUsed / 1024 / 1024).toFixed(1);
+    const allouee = (memoire.heapTotal / 1024 / 1024).toFixed(1);
+    return `${utilisee} Mo / ${allouee} Mo`;
 }
 
-async function logError(type, error) {
-    if (!client) return;
+async function consignerAlerte(type, erreur) {
+    if (!clientDiscord?.isReady()) return;
 
     try {
-        const guild = client.guilds.cache.get('1501671610879312036');
+        const guild = clientDiscord.guilds.cache.get(config.guildId);
         if (!guild) return;
 
-        const logsChannel = guild.channels.cache.get('1502321982082125995');
-        if (!logsChannel) return;
+        const salon = guild.channels.cache.get(config.channels.logsBot);
+        if (!salon?.isTextBased()) return;
 
-        const errorMessage = error instanceof Error ? error.stack || error.message : String(error);
-        const truncated = errorMessage.length > 1900 ? errorMessage.substring(0, 1900) + '...' : errorMessage;
+        const details = erreur instanceof Error
+            ? erreur.stack || erreur.message
+            : String(erreur);
 
-        await logsChannel.send({
-            content: `[ALERTE CRITIQUE] Type : ${type}\nHeure : ${new Date().toUTCString()}\nDétails :\n\`\`\`\n${truncated}\n\`\`\``
+        const extrait = details.length > 1800
+            ? `${details.slice(0, 1800)}…`
+            : details;
+
+        await salon.send({
+            content: [
+                '[ALERTE TECHNIQUE]',
+                `Type : ${type}`,
+                `Horodatage : ${new Date().toISOString()}`,
+                '```',
+                extrait,
+                '```'
+            ].join('\n')
         });
     } catch (e) {
-        console.error('[KEEP-ALIVE] Impossible d\'envoyer le log d\'erreur :', e);
+        console.error(`[SURVEILLANCE] Consignation impossible : ${e.message}`);
     }
 }
 
-function getMemoryUsage() {
-    const mem = process.memoryUsage();
-    const mb = (mem.heapUsed / 1024 / 1024).toFixed(2);
-    const total = (mem.heapTotal / 1024 / 1024).toFixed(2);
-    return `${mb}MB / ${total}MB`;
+function initialize(client) {
+    if (surveillanceActive) return;
+
+    clientDiscord = client;
+    surveillanceActive = true;
+
+    console.log('[SURVEILLANCE] Contrôle périodique de la session activé.');
+
+    setInterval(() => {
+        if (!clientDiscord) return;
+
+        if (!clientDiscord.isReady()) {
+            console.warn('[SURVEILLANCE] Session indisponible. Le gestionnaire de connexion prend le relais.');
+            return;
+        }
+
+        console.log(
+            `[SURVEILLANCE] Session active. Latence : ${Math.round(clientDiscord.ws.ping)} ms. Mémoire : ${consommationMemoire()}.`
+        );
+    }, 300000);
 }
 
 module.exports = {
     initialize,
-    getMemoryUsage
+    consommationMemoire,
+    consignerAlerte
 };
