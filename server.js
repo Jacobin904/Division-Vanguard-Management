@@ -8,9 +8,6 @@ const session = require('express-session');
 const fetch = require('node-fetch');
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
 const GUILD_ID = '1501671610879312036';
 const MOT_DE_PASSE_SITE = '3057';
 
@@ -27,9 +24,6 @@ const ROLE_MILITAIRE = [
 ];
 const ROLES_AUTORISES = [...ROLE_STAFF, ...ROLE_MILITAIRE];
 
-// ============================================================================
-// CLIENT DISCORD
-// ============================================================================
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration,
@@ -70,12 +64,9 @@ process.on('SIGTERM', () => console.log('[SIGNAL] SIGTERM ignoré.'));
 process.on('SIGINT', () => console.log('[SIGNAL] SIGINT ignoré.'));
 
 client.login(process.env.DISCORD_BOT_TOKEN).catch(err => {
-    console.error('[BOT] Échec de connexion Discord :', err.message);
+    console.error('[BOT] Échec connexion Discord :', err.message);
 });
 
-// ============================================================================
-// SERVEUR WEB
-// ============================================================================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -86,19 +77,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'secret_par_defaut_change_le',
+    secret: process.env.SESSION_SECRET || 'secret_par_defaut',
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: true,
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000
     }
 }));
-
-// ============================================================================
-// ROUTES
-// ============================================================================
 
 app.get('/', (req, res) => {
     if (req.session.authenticated) {
@@ -110,31 +97,25 @@ app.get('/', (req, res) => {
 app.post('/verify', async (req, res) => {
     const { password, discordId } = req.body;
 
-    // Vérification du mot de passe
+    console.log(`[WEB] Tentative de connexion avec ID: ${discordId}`);
+
     if (password !== MOT_DE_PASSE_SITE) {
+        console.log('[WEB] Mot de passe incorrect');
         return res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
     }
 
-    // Vérification de l'ID Discord
     if (!discordId || discordId.length < 15) {
-        return res.status(400).send(`
-            <html>
-            <body style="background: #1a1a1a; color: #e0e0e0; font-family: sans-serif; text-align: center; padding: 50px;">
-                <h1 style="color: #e74c3c;">Erreur</h1>
-                <p>ID Discord invalide.</p>
-                <a href="/" style="color: #3498db;">Retour</a>
-            </body>
-            </html>
-        `);
+        console.log('[WEB] ID Discord invalide');
+        return res.status(400).send('ID Discord invalide.');
     }
 
     try {
-        // Vérification des rôles via l'API Discord
         const response = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/${discordId}`, {
             headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}` }
         });
 
         if (!response.ok) {
+            console.log(`[WEB] Utilisateur non trouvé sur le serveur (code ${response.status})`);
             return res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
         }
 
@@ -142,21 +123,20 @@ app.post('/verify', async (req, res) => {
         const aUnRoleAutorise = member.roles.some(role => ROLES_AUTORISES.includes(role));
 
         if (!aUnRoleAutorise) {
+            console.log('[WEB] Rôles insuffisants');
             return res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
         }
 
-        // Récupération des informations de l'utilisateur
         const userResponse = await fetch(`https://discord.com/api/v10/users/${discordId}`, {
             headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}` }
         });
 
         if (!userResponse.ok) {
-            return res.status(500).send('Erreur lors de la récupération des informations utilisateur.');
+            return res.status(500).send('Erreur récupération utilisateur.');
         }
 
         const user = await userResponse.json();
 
-        // Authentification réussie
         req.session.authenticated = true;
         req.session.user = {
             id: user.id,
@@ -166,12 +146,12 @@ app.post('/verify', async (req, res) => {
             roles: member.roles
         };
 
-        console.log(`[WEB] Utilisateur ${user.username} authentifié avec succès.`);
+        console.log(`[WEB] Connexion réussie pour ${user.username}`);
         res.redirect('/dashboard');
 
     } catch (error) {
-        console.error('[WEB] Erreur lors de la vérification :', error);
-        res.status(500).send('Erreur interne du serveur.');
+        console.error('[WEB] Erreur vérification :', error);
+        res.status(500).send('Erreur interne.');
     }
 });
 
@@ -209,5 +189,5 @@ app.get('/logout', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`[WEB] Portail sécurisé actif sur le port ${PORT}`);
+    console.log(`[WEB] Portail actif sur le port ${PORT}`);
 });
