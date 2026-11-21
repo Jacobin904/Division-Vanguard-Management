@@ -8,17 +8,6 @@ function initialize(clientInstance) {
     client = clientInstance;
     console.log('[KEEP-ALIVE] Système de surveillance activé.');
 
-    process.on('uncaughtException', (error) => {
-        console.error('[KEEP-ALIVE] ERREUR NON CAPTURÉE DÉTECTÉE :', error);
-        console.error('[KEEP-ALIVE] Le processus ne plantera pas, récupération en cours...');
-        logError('UNCAUGHT_EXCEPTION', error);
-    });
-
-    process.on('unhandledRejection', (reason, promise) => {
-        console.error('[KEEP-ALIVE] PROMESSE REJETÉE NON GÉRÉE :', reason);
-        logError('UNHANDLED_REJECTION', reason);
-    });
-
     // Watchdog : vérifie toutes les 60 secondes que le bot est bien connecté
     watchdogInterval = setInterval(() => {
         if (!client || !client.ws) {
