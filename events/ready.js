@@ -2,7 +2,7 @@
 
 const { Events, ActivityType } = require('discord.js');
 const { initialize } = require('../utils/keepAlive');
-const config = require('../config/guildConfig');
+const { connecterAuVocal, demarrerSurveillance } = require('../utils/voiceManager');
 
 module.exports = {
     name: Events.ClientReady,
@@ -28,21 +28,23 @@ module.exports = {
             status: 'online'
         });
 
-        // Connexion vocale différée pour ne pas concurrencer l'ouverture de session
+        setInterval(() => {
+            if (client.user && client.ws.status === 0) {
+                client.user.setStatus('online');
+            }
+        }, 300000);
+
         setTimeout(async () => {
-            try {
-                const { connecterAuVocal, demarrerSurveillance } = require('../utils/voiceManager');
-                const guild = client.guilds.cache.get(config.guildId);
-
-                if (!guild) {
-                    console.warn('[VOCAL] Serveur principal introuvable.');
-                    return;
-                }
-
-                await connecterAuVocal(guild);
+            const guild = client.guilds.cache.get('1501671610879312036');
+            if (guild) {
+                const succes = await connecterAuVocal(guild);
                 demarrerSurveillance(client);
-            } catch (erreur) {
-                console.error(`[VOCAL] Initialisation impossible : ${erreur.message}`);
+                
+                if (!succes) {
+                    console.log('[VOCAL] Première tentative échouée, la surveillance continuera de réessayer.');
+                }
+            } else {
+                console.error('[BOT] Serveur principal introuvable.');
             }
         }, 8000);
     }
