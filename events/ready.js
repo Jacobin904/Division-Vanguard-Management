@@ -41,7 +41,6 @@ module.exports = {
                     demarrerSurveillance(client);
                 } else {
                     console.warn('[VOICE] Connexion vocale échouée au démarrage. La surveillance sera activée après la première reconnexion.');
-                    // Démarrer quand même la surveillance pour tenter de reconnecter plus tard
                     demarrerSurveillance(client);
                 }
             } else {
