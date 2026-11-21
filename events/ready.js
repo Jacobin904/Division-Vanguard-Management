@@ -2,50 +2,48 @@
 
 const { Events, ActivityType } = require('discord.js');
 const { initialize } = require('../utils/keepAlive');
-const { connecterAuVocal, demarrerSurveillance } = require('../utils/voiceManager');
+const config = require('../config/guildConfig');
 
 module.exports = {
     name: Events.ClientReady,
     once: true,
-    async execute(client) {
-        console.log('='.repeat(60));
-        console.log('[BOT] Connecté en tant que : ' + client.user.tag);
-        console.log('[BOT] ID : ' + client.user.id);
-        console.log('[BOT] Serveurs : ' + client.guilds.cache.size);
-        console.log('[BOT] Membres totaux : ' + client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0));
-        console.log('[BOT] Heure de connexion : ' + new Date().toUTCString());
-        console.log('='.repeat(60));
 
-        // Activation du système de keep-alive
+    async execute(client) {
+        console.log('============================================================');
+        console.log(`[BOT] Session ouverte : ${client.user.tag}`);
+        console.log(`[BOT] Identifiant : ${client.user.id}`);
+        console.log(`[BOT] Serveurs desservis : ${client.guilds.cache.size}`);
+        console.log(`[BOT] Horodatage : ${new Date().toISOString()}`);
+        console.log('============================================================');
+
         initialize(client);
 
-        // Présence personnalisée
         client.user.setPresence({
-            activities: [{ name: 'Division Vanguard | Surveillance active', type: ActivityType.Watching }],
+            activities: [
+                {
+                    name: 'Division Vanguard — Surveillance active',
+                    type: ActivityType.Watching
+                }
+            ],
             status: 'online'
         });
 
-        // Force le statut en ligne en permanence
-        setInterval(() => {
-            if (client.user && client.ws.status === 0) {
-                client.user.setStatus('online');
-            }
-        }, 300000); // Toutes les 5 minutes
-
-        // Connexion au salon vocal avec délai pour éviter les conflits au démarrage
+        // Connexion vocale différée pour ne pas concurrencer l'ouverture de session
         setTimeout(async () => {
-            const guild = client.guilds.cache.get('1501671610879312036');
-            if (guild) {
-                const succes = await connecterAuVocal(guild);
-                if (succes) {
-                    demarrerSurveillance(client);
-                } else {
-                    console.warn('[VOICE] Connexion vocale échouée au démarrage. La surveillance sera activée après la première reconnexion.');
-                    demarrerSurveillance(client);
+            try {
+                const { connecterAuVocal, demarrerSurveillance } = require('../utils/voiceManager');
+                const guild = client.guilds.cache.get(config.guildId);
+
+                if (!guild) {
+                    console.warn('[VOCAL] Serveur principal introuvable.');
+                    return;
                 }
-            } else {
-                console.error('[BOT] Serveur principal introuvable.');
+
+                await connecterAuVocal(guild);
+                demarrerSurveillance(client);
+            } catch (erreur) {
+                console.error(`[VOCAL] Initialisation impossible : ${erreur.message}`);
             }
-        }, 5000); // Attendre 5 secondes après le démarrage
+        }, 8000);
     }
 };
