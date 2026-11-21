@@ -2,7 +2,7 @@
 
 const { Events, ActivityType } = require('discord.js');
 const { initialize } = require('../utils/keepAlive');
-const { connecterAuVocal, demarrerSurveillance } = require('../utils/voiceManager');
+const voice = require('../utils/voiceManager');
 
 module.exports = {
     name: Events.ClientReady,
@@ -18,37 +18,11 @@ module.exports = {
 
         initialize(client);
 
-        // Statut fixe
         client.user.setPresence({
-            activities: [
-                {
-                    name: '.gg/division-vanguard',
-                    type: ActivityType.Playing
-                }
-            ],
+            activities: [{ name: '.gg/division-vanguard', type: ActivityType.Playing }],
             status: 'online'
         });
 
-        // Force le statut en ligne en permanence
-        setInterval(() => {
-            if (client.user && client.ws.status === 0) {
-                client.user.setStatus('online');
-            }
-        }, 300000);
-
-        // Connexion vocale différée
-        setTimeout(async () => {
-            const guild = client.guilds.cache.get('1501671610879312036');
-            if (guild) {
-                const succes = await connecterAuVocal(guild);
-                demarrerSurveillance(client);
-                
-                if (!succes) {
-                    console.log('[VOCAL] Première tentative échouée, la surveillance continuera de réessayer.');
-                }
-            } else {
-                console.error('[BOT] Serveur principal introuvable.');
-            }
-        }, 8000);
+        setTimeout(() => voice.initialiser(client), 5000);
     }
 };
