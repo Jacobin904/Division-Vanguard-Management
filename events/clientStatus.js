@@ -1,60 +1,87 @@
+'use strict';
+
 const { Events } = require('discord.js');
 
+const MODE_VERBEUX = process.env.LOGS_VERBEUX === 'true';
+
 /**
- * Surveillance de tous les evenements de connexion/deconnexion
+ * Codes de fermeture WebSocket imposés par Discord.
+ * Ils font partie du fonctionnement normal du service et ne doivent
+ * jamais être présentés comme des incidents.
  */
+const CODES_ROUTINE = new Set([
+    4200, // Reconnexion demandée par Discord, session reprise
+    1001, // Le serveur gateway redémarre
+    1000  // Fermeture normale
+]);
+
+function horodatage() {
+    return new Date().toISOString();
+}
+
 module.exports = {
     registerAll(client) {
-        // Deconnexion (Discord a coupe la connexion)
+        // Déconnexion du shard
         client.on(Events.ShardDisconnect, (event, shardId) => {
-            console.warn(`[SHARD ${shardId}] Deconnecte. Code : ${event.code}. Raison : ${event.reason || 'Inconnue'}`);
-            console.log('[SHARD] Reconnexion automatique declenchee par Discord.js...');
+            const code = event?.code;
+            const routine = CODES_ROUTINE.has(code);
+
+            if (routine) {
+                if (MODE_VERBEUX) {
+                    console.log(`[GATEWAY] Entretien Discord (code ${code}). Reprise de la session en cours.`);
+                }
+                return;
+            }
+
+            console.warn(`[GATEWAY] Coupure inattendue (code ${code}). Reconnexion automatique.`);
         });
 
-        // Reconnexion en cours
+        // Reprise de session en cours
         client.on(Events.ShardReconnecting, (shardId) => {
-            console.log(`[SHARD ${shardId}] Reconnexion en cours...`);
-        });
-
-        // Resume reussi (reconnexion sans perdre d'evenements)
-        client.on(Events.ShardResume, (shardId, replayedEvents) => {
-            console.log(`[SHARD ${shardId}] Reconnexion reussie. ${replayedEvents} evenements rejoues.`);
-        });
-
-        // Erreur WebSocket
-        client.on(Events.ShardError, (error, shardId) => {
-            console.error(`[SHARD ${shardId}] Erreur WebSocket :`, error);
-        });
-
-        // Rate limit (Discord nous demande de ralentir)
-        client.on('rateLimit', (rateLimitData) => {
-            console.warn('[RATE LIMIT] Detecte :', {
-                timeout: rateLimitData.timeout,
-                limit: rateLimitData.limit,
-                method: rateLimitData.method,
-                path: rateLimitData.route,
-                route: rateLimitData.route
-            });
-        });
-
-        // Warn Discord.js
-        client.on(Events.Debug, (info) => {
-            // On ne log que les messages importants pour eviter le spam
-            if (info.includes('Heartbeat') || info.includes('connect') || info.includes('disconnect')) {
-                console.log('[DEBUG]', info);
+            if (MODE_VERBEUX) {
+                console.log(`[GATEWAY] Reprise de la session du shard ${shardId}.`);
             }
         });
 
-        // Erreur generale du client
+        // Session reprise avec succès
+        client.on(Events.ShardResume, (shardId, replayedEvents) => {
+            if (MODE_VERBEUX) {
+                console.log(`[GATEWAY] Session reprise. ${replayedEvents} événement(s) rejoué(s).`);
+            }
+        });
+
+        // Shard prêt
+        client.on(Events.ShardReady, (shardId) => {
+            console.log(`[GATEWAY] Shard ${shardId} opérationnel.`);
+        });
+
+        // Erreur réelle sur le shard
+        client.on(Events.ShardError, (error, shardId) => {
+            console.error(`[GATEWAY] Erreur sur le shard ${shardId} : ${error.message}`);
+        });
+
+        // Limitation de débit
+        client.on(Events.RateLimit, (data) => {
+            console.warn(`[API] Limitation de débit atteinte sur ${data.route}. Pause de ${data.timeout} ms.`);
+        });
+
+        // Avertissement du client
+        client.on(Events.Warn, (message) => {
+            console.warn(`[CLIENT] ${message}`);
+        });
+
+        // Erreur du client
         client.on(Events.Error, (error) => {
-            console.error('[CLIENT ERROR]', error);
+            console.error(`[CLIENT] ${error.message}`);
         });
 
-        // Warn du client
-        client.on(Events.Warn, (warning) => {
-            console.warn('[CLIENT WARN]', warning);
-        });
+        // Les messages de débogage ne sont affichés qu'en mode verbeux
+        if (MODE_VERBEUX) {
+            client.on(Events.Debug, (info) => {
+                console.log(`[DEBUG] ${info}`);
+            });
+        }
 
-        console.log('[EVENTS] Tous les gestionnaires de statut enregistres.');
+        console.log('[GATEWAY] Surveillance de la connexion activée.');
     }
 };
