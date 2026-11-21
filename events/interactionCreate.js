@@ -47,7 +47,53 @@ module.exports = {
                 if (interaction.isModalSubmit() && interaction.customId === 'rapport_mission_modal') {
                     return handleRapportModal(interaction);
                 }
-
+            // Dans la section de gestion des boutons, ajoute :
+            
+            if (interaction.isButton()) {
+                // Gestion des boutons de navigation des règlements
+                if (interaction.customId.startsWith('reglement_chapitre_')) {
+                    const chapitre = interaction.customId.replace('reglement_chapitre_', '');
+                    
+                    let embedChapitre;
+                    switch (chapitre) {
+                            case '1':
+                            embedChapitre = require('../commands/message').creerEmbedChapitre1 ? 
+                                    require('../commands/message').creerEmbedChapitre1() : null;
+                            break;
+                        case '2':
+                            embedChapitre = require('../commands/message').creerEmbedChapitre2 ? 
+                                require('../commands/message').creerEmbedChapitre2() : null;
+                            break;
+                        case '3':
+                            embedChapitre = require('../commands/message').creerEmbedChapitre3 ? 
+                                require('../commands/message').creerEmbedChapitre3() : null;
+                            break;
+                        case '4':
+                            embedChapitre = require('../commands/message').creerEmbedChapitre4 ? 
+                                require('../commands/message').creerEmbedChapitre4() : null;
+                            break;
+                        case '5':
+                            embedChapitre = require('../commands/message').creerEmbedChapitre5 ? 
+                                require('../commands/message').creerEmbedChapitre5() : null;
+                            break;
+                        }
+        
+                    if (embedChapitre) {
+                        await interaction.reply({
+                            embeds: [embedChapitre],
+                            flags: MessageFlags.Ephemeral
+                        });
+                    } else {
+                        await interaction.reply({
+                            content: '[ERREUR] Chapitre non trouvé.',
+                            flags: MessageFlags.Ephemeral
+                        });
+                    }
+                      return;
+                }
+    
+    // ... reste du code existant pour les autres boutons
+}
                 // Gestion des tickets
                 const gere = await ticketCommand.handleTicketInteraction(interaction);
                 if (gere) return;
