@@ -19,15 +19,6 @@ module.exports = {
         // Activation du système de keep-alive
         initialize(client);
 
-        // Connexion au salon vocal
-        const guild = client.guilds.cache.get('1501671610879312036');
-        if (guild) {
-            await connecterAuVocal(guild);
-            demarrerSurveillance(client);
-        } else {
-            console.error('[BOT] Serveur principal introuvable.');
-        }
-
         // Présence personnalisée
         client.user.setPresence({
             activities: [{ name: 'Division Vanguard | Surveillance active', type: ActivityType.Watching }],
@@ -40,5 +31,22 @@ module.exports = {
                 client.user.setStatus('online');
             }
         }, 300000); // Toutes les 5 minutes
+
+        // Connexion au salon vocal avec délai pour éviter les conflits au démarrage
+        setTimeout(async () => {
+            const guild = client.guilds.cache.get('1501671610879312036');
+            if (guild) {
+                const succes = await connecterAuVocal(guild);
+                if (succes) {
+                    demarrerSurveillance(client);
+                } else {
+                    console.warn('[VOICE] Connexion vocale échouée au démarrage. La surveillance sera activée après la première reconnexion.');
+                    // Démarrer quand même la surveillance pour tenter de reconnecter plus tard
+                    demarrerSurveillance(client);
+                }
+            } else {
+                console.error('[BOT] Serveur principal introuvable.');
+            }
+        }, 5000); // Attendre 5 secondes après le démarrage
     }
 };
