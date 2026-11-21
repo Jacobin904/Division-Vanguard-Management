@@ -14,10 +14,6 @@ const {
 const config = require('./config');
 const clientStatus = require('./events/clientStatus');
 
-// ============================================================================
-// SONDE HTTP POUR L'HÉBERGEUR
-// ============================================================================
-
 const PORT = Number(process.env.PORT) || 3000;
 
 const serveur = http.createServer((requete, reponse) => {
@@ -33,10 +29,6 @@ serveur.on('error', (erreur) => {
     console.error(`[HTTP] Erreur du serveur : ${erreur.message}`);
 });
 
-// ============================================================================
-// CLIENT DISCORD
-// ============================================================================
-
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -48,21 +40,10 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ],
-    partials: [Partials.Channel, Partials.GuildMember, Partials.User],
-    ws: {
-        large_threshold: 250
-    },
-    rest: {
-        timeout: 30000,
-        retries: 3
-    }
+    partials: [Partials.Channel, Partials.GuildMember, Partials.User]
 });
 
 client.commands = new Collection();
-
-// ============================================================================
-// CHARGEMENT DES COMMANDES
-// ============================================================================
 
 const dossierCommandes = path.join(__dirname, 'commands');
 
@@ -81,10 +62,6 @@ for (const fichier of fs.readdirSync(dossierCommandes).filter((f) => f.endsWith(
         console.error(`[COMMANDE] Échec du chargement de ${fichier} : ${erreur.message}`);
     }
 }
-
-// ============================================================================
-// CHARGEMENT DES ÉVÉNEMENTS
-// ============================================================================
 
 const dossierEvenements = path.join(__dirname, 'events');
 
@@ -111,10 +88,6 @@ for (const fichier of fs.readdirSync(dossierEvenements).filter((f) => f.endsWith
 
 clientStatus.registerAll(client);
 
-// ============================================================================
-// PROTECTION CONTRE LES ARRÊTS INVOLONTAIRES
-// ============================================================================
-
 process.on('uncaughtException', (erreur) => {
     console.error(`[ERREUR] Exception non interceptée : ${erreur.stack || erreur.message}`);
 });
@@ -131,10 +104,6 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
     console.log('[SIGNAL] SIGINT reçu et ignoré. Le service demeure actif.');
 });
-
-// ============================================================================
-// CONNEXION À DISCORD
-// ============================================================================
 
 let tentatives = 0;
 
@@ -154,10 +123,6 @@ async function connecter() {
 }
 
 connecter();
-
-// ============================================================================
-// SURVEILLANCE DE L'ÉTAT DE LA SESSION
-// ============================================================================
 
 setInterval(() => {
     if (!client.isReady()) {
