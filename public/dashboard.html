@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de Bord - Division Vanguard</title>
+    <style>
+        body { background-color: #1a1a1a; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        header { background-color: #2b3a55; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { margin: 0; font-size: 22px; color: white; }
+        .logout-btn { background-color: #c0392b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; }
+        .logout-btn:hover { background-color: #e74c3c; }
+        .content { padding: 40px; max-width: 1200px; margin: 0 auto; }
+        .card { background-color: #2b2b2b; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #34568b; }
+        .card h2 { margin-top: 0; color: #ffffff; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Division Vanguard - Portail Interne</h1>
+        <a href="/logout" class="logout-btn">Déconnexion</a>
+    </header>
+    <div class="content">
+        <div class="card">
+            <h2>Bienvenue sur le portail sécurisé</h2>
+            <p>Votre authentification a été vérifiée avec succès. Vous avez accès aux ressources réservées au personnel militaire et au staff de la Division Vanguard.</p>
+        </div>
+        <div class="card">
+            <h2>État du système</h2>
+            <p>Bot Discord : <span style="color: #2ecc71;">En ligne</span></p>
+            <p>Serveur Web : <span style="color: #2ecc71;">Opérationnel</span></p>
+        </div>
+    </div>
+</body>
+</html>
