@@ -30,7 +30,7 @@ const ROLE_MILITAIRE = [
 const ROLES_AUTORISES = [...ROLE_STAFF, ...ROLE_MILITAIRE];
 
 // ============================================================================
-// CLIENT DISCORD (Initialisé en premier pour être disponible dans les routes)
+// CLIENT DISCORD
 // ============================================================================
 const client = new Client({
     intents: [
@@ -81,16 +81,24 @@ client.login(process.env.DISCORD_BOT_TOKEN).catch(err => {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// INDISPENSABLE pour Render/Canner : faire confiance au proxy pour les cookies HTTPS
+app.set('trust proxy', 1);
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 
+// Configuration de la session corrigée pour HTTPS
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'secret_par_defaut_change_le_en_prod',
+    secret: process.env.SESSION_SECRET || 'une_chaine_secrete_tres_longue_et_aleatoire_12345',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production' }
+    cookie: { 
+        secure: true, // Obligatoire car le site est en https://
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 heures
+    }
 }));
 
 app.use(passport.initialize());
@@ -149,6 +157,7 @@ app.get('/', (req, res) => {
 app.post('/verify-password', (req, res) => {
     if (req.body.password === MOT_DE_PASSE_SITE) {
         req.session.passwordVerified = true;
+        console.log('[WEB] Mot de passe vérifié avec succès pour la session.');
         res.redirect('/auth/discord');
     } else {
         res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
@@ -159,11 +168,15 @@ app.get('/auth/discord', passport.authenticate('discord'));
 
 app.get('/auth/discord/callback', 
     passport.authenticate('discord', { failureRedirect: '/unauthorized' }), 
-    (req, res) => { res.redirect('/dashboard'); }
+    (req, res) => {
+        console.log(`[WEB] Utilisateur ${req.user.username} authentifié avec succès.`);
+        res.redirect('/dashboard');
+    }
 );
 
 app.get('/dashboard', (req, res) => {
     if (!req.session.passwordVerified || !req.isAuthenticated()) {
+        console.log('[WEB] Tentative d\'accès au dashboard sans session valide, redirection.');
         return res.redirect('/');
     }
     
