@@ -11,6 +11,26 @@ const fetch = require('node-fetch');
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 
 // ============================================================================
+// VÉRIFICATION DES VARIABLES D'ENVIRONNEMENT
+// ============================================================================
+const variablesManquantes = [];
+if (!process.env.DISCORD_BOT_TOKEN) variablesManquantes.push('DISCORD_BOT_TOKEN');
+if (!process.env.DISCORD_CLIENT_ID) variablesManquantes.push('DISCORD_CLIENT_ID');
+if (!process.env.DISCORD_CLIENT_SECRET) variablesManquantes.push('DISCORD_CLIENT_SECRET');
+if (!process.env.DISCORD_REDIRECT_URI) variablesManquantes.push('DISCORD_REDIRECT_URI');
+
+if (variablesManquantes.length > 0) {
+    console.error('='.repeat(60));
+    console.error('[ERREUR CRITIQUE] Variables d\'environnement manquantes :');
+    variablesManquantes.forEach(v => console.error(`  - ${v}`));
+    console.error('');
+    console.error('Allez sur Render > Environment > Add Environment Variable');
+    console.error('et ajoutez toutes les variables listées ci-dessus.');
+    console.error('='.repeat(60));
+    process.exit(1);
+}
+
+// ============================================================================
 // CONFIGURATION
 // ============================================================================
 const GUILD_ID = '1501671610879312036';
@@ -68,83 +88,84 @@ for (const file of fs.readdirSync(eventsPath).filter(f => f.endsWith('.js') && f
     }
 }
 
-process.on('SIGTERM', () => console.log('[SIGNAL] SIGTERM ignoré. Service actif.'));
-process.on('SIGINT', () => console.log('[SIGNAL] SIGINT ignoré. Service actif.'));
+process.on('SIGTERM', () => console.log('[SIGNAL] SIGTERM ignoré.'));
+process.on('SIGINT', () => console.log('[SIGNAL] SIGINT ignoré.'));
 
 client.login(process.env.DISCORD_BOT_TOKEN).catch(err => {
     console.error('[BOT] Échec de connexion Discord :', err.message);
 });
 
 // ============================================================================
-// SERVEUR WEB (Express)
+// SERVEUR WEB
 // ============================================================================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// INDISPENSABLE pour Render/Canner : faire confiance au proxy pour les cookies HTTPS
 app.set('trust proxy', 1);
-
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 
-// Configuration de la session corrigée pour HTTPS
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'une_chaine_secrete_tres_longue_et_aleatoire_12345',
+    secret: process.env.SESSION_SECRET || 'secret_par_defaut_change_le',
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: true, // Obligatoire car le site est en https://
+        secure: true,
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24 heures
+        maxAge: 24 * 60 * 60 * 1000
     }
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Stratégie d'authentification Discord
-passport.use(new DiscordStrategy({
-    clientID: process.env.DISCORD_CLIENT_ID,
-    clientSecret: process.env.DISCORD_CLIENT_SECRET,
-    callbackURL: process.env.DISCORD_REDIRECT_URI,
-    scope: ['identify', 'guilds']
-}, async (accessToken, refreshToken, profile, done) => {
-    try {
-        const response = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/${profile.id}`, {
-            headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}` }
-        });
+// Configuration OAuth2 Discord
+try {
+    passport.use(new DiscordStrategy({
+        clientID: process.env.DISCORD_CLIENT_ID,
+        clientSecret: process.env.DISCORD_CLIENT_SECRET,
+        callbackURL: process.env.DISCORD_REDIRECT_URI,
+        scope: ['identify', 'guilds']
+    }, async (accessToken, refreshToken, profile, done) => {
+        try {
+            const response = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/${profile.id}`, {
+                headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}` }
+            });
 
-        if (!response.ok) {
-            return done(null, false, { message: 'Utilisateur non trouvé sur le serveur.' });
+            if (!response.ok) {
+                return done(null, false, { message: 'Utilisateur non trouvé sur le serveur.' });
+            }
+
+            const member = await response.json();
+            const aUnRoleAutorise = member.roles.some(role => ROLES_AUTORISES.includes(role));
+
+            if (!aUnRoleAutorise) {
+                return done(null, false, { message: 'Accès refusé : Rôle insuffisant.' });
+            }
+
+            return done(null, {
+                id: profile.id,
+                username: profile.username,
+                discriminator: profile.discriminator,
+                avatar: profile.avatar,
+                roles: member.roles
+            });
+        } catch (error) {
+            console.error('[WEB] Erreur vérification rôles :', error);
+            return done(error, null);
         }
+    }));
 
-        const member = await response.json();
-        const aUnRoleAutorise = member.roles.some(role => ROLES_AUTORISES.includes(role));
-
-        if (!aUnRoleAutorise) {
-            return done(null, false, { message: 'Accès refusé : Rôle insuffisant.' });
-        }
-
-        return done(null, {
-            id: profile.id,
-            username: profile.username,
-            discriminator: profile.discriminator,
-            avatar: profile.avatar,
-            roles: member.roles
-        });
-    } catch (error) {
-        console.error('[WEB] Erreur lors de la vérification des rôles :', error);
-        return done(error, null);
-    }
-}));
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
+    passport.serializeUser((user, done) => done(null, user));
+    passport.deserializeUser((obj, done) => done(null, obj));
+} catch (error) {
+    console.error('[WEB] Erreur configuration OAuth2 :', error.message);
+}
 
 // ============================================================================
-// ROUTES DU SITE WEB
+// ROUTES
 // ============================================================================
 
 app.get('/', (req, res) => {
@@ -157,7 +178,6 @@ app.get('/', (req, res) => {
 app.post('/verify-password', (req, res) => {
     if (req.body.password === MOT_DE_PASSE_SITE) {
         req.session.passwordVerified = true;
-        console.log('[WEB] Mot de passe vérifié avec succès pour la session.');
         res.redirect('/auth/discord');
     } else {
         res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
@@ -168,15 +188,11 @@ app.get('/auth/discord', passport.authenticate('discord'));
 
 app.get('/auth/discord/callback', 
     passport.authenticate('discord', { failureRedirect: '/unauthorized' }), 
-    (req, res) => {
-        console.log(`[WEB] Utilisateur ${req.user.username} authentifié avec succès.`);
-        res.redirect('/dashboard');
-    }
+    (req, res) => { res.redirect('/dashboard'); }
 );
 
 app.get('/dashboard', (req, res) => {
     if (!req.session.passwordVerified || !req.isAuthenticated()) {
-        console.log('[WEB] Tentative d\'accès au dashboard sans session valide, redirection.');
         return res.redirect('/');
     }
     
@@ -196,11 +212,7 @@ app.get('/dashboard', (req, res) => {
         boostCount: guild.premiumSubscriptionCount || 0
     } : null;
 
-    res.render('dashboard', { 
-        user: req.user, 
-        roles: userRoles, 
-        guild: guildInfo 
-    });
+    res.render('dashboard', { user: req.user, roles: userRoles, guild: guildInfo });
 });
 
 app.get('/unauthorized', (req, res) => {
@@ -214,5 +226,5 @@ app.get('/logout', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`[WEB] Portail sécurisé actif sur le port ${PORT}`);
+    console.log(`[WEB] Portail actif sur le port ${PORT}`);
 });
