@@ -1,8 +1,35 @@
+'use strict';
+
 const { Client, Collection, GatewayIntentBits, Partials, Events } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config');
 const clientStatus = require('./events/clientStatus');
+const http = require('http');
+
+// ============================================================================
+// SERVEUR HTTP MINIMAL POUR LE HEALTH CHECK DE RENDER
+// ============================================================================
+
+const PORT = process.env.PORT || 3000;
+
+const server = http.createServer((req, res) => {
+    if (req.url === '/health' || req.url === '/') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('OK');
+    } else {
+        res.writeHead(404);
+        res.end();
+    }
+});
+
+server.listen(PORT, () => {
+    console.log(`[HTTP] Serveur de health check actif sur le port ${PORT}`);
+});
+
+// ============================================================================
+// CLIENT DISCORD
+// ============================================================================
 
 const client = new Client({
     intents: [
@@ -11,7 +38,9 @@ const client = new Client({
         GatewayIntentBits.GuildEmojisAndStickers,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildModeration,
-        GatewayIntentBits.GuildPresences
+        GatewayIntentBits.GuildPresences,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
     ],
     partials: [Partials.Channel, Partials.GuildMember, Partials.User],
     ws: {
@@ -24,7 +53,10 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Chargement des commandes
+// ============================================================================
+// CHARGEMENT DES COMMANDES
+// ============================================================================
+
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
@@ -42,9 +74,12 @@ for (const file of commandFiles) {
     }
 }
 
-// Chargement des événements (EXCLUSION de clientStatus.js qui est géré séparément)
+// ============================================================================
+// CHARGEMENT DES ÉVÉNEMENTS
+// ============================================================================
+
 const eventsPath = path.join(__dirname, 'events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file =>
+const eventFiles = fs.readdirSync(eventsPath).filter(file => 
     file.endsWith('.js') && file !== 'clientStatus.js'
 );
 
@@ -62,10 +97,13 @@ for (const file of eventFiles) {
     }
 }
 
-// Enregistrement des gestionnaires de statut WebSocket (manuel)
+// Enregistrement des gestionnaires de statut WebSocket
 clientStatus.registerAll(client);
 
-// Gestionnaire de connexion/reconnexion automatique
+// ============================================================================
+// GESTIONNAIRE DE CONNEXION/RECONNEXION
+// ============================================================================
+
 let reconnectAttempts = 0;
 const MAX_RECONNECT_DELAY = 60000;
 
@@ -80,13 +118,69 @@ client.on(Events.ShardReady, () => {
     console.log('[RECONNECT] Compteur de tentatives réinitialisé.');
 });
 
-// Login avec retry automatique
+// ============================================================================
+// GESTION DES ERREURS GLOBALES
+// ============================================================================
+
+process.on('uncaughtException', (error) => {
+    console.error('[ERREUR NON CAPTURÉE]', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[PROMESSE REJETÉE]', reason);
+});
+
+// ============================================================================
+// ARRÊT PROPRE
+// ============================================================================
+
+let isShuttingDown = false;
+
+function gracefulShutdown(signal) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    
+    console.log(`[ARRÊT] Signal ${signal} reçu. Arrêt propre en cours...`);
+    
+    // Fermer le serveur HTTP
+    server.close(() => {
+        console.log('[HTTP] Serveur fermé.');
+    });
+    
+    // Déconnecter le client Discord
+    if (client.isReady()) {
+        client.destroy().then(() => {
+            console.log('[DISCORD] Client déconnecté proprement.');
+            process.exit(0);
+        }).catch((err) => {
+            console.error('[DISCORD] Erreur lors de la déconnexion :', err);
+            process.exit(1);
+        });
+    } else {
+        process.exit(0);
+    }
+    
+    // Timeout de sécurité
+    setTimeout(() => {
+        console.error('[ARRÊT] Timeout atteint, arrêt forcé.');
+        process.exit(1);
+    }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// ============================================================================
+// CONNEXION À DISCORD
+// ============================================================================
+
 async function loginWithRetry() {
     try {
         await client.login(config.token);
+        console.log('[DISCORD] Connexion réussie.');
     } catch (error) {
-        console.error('[LOGIN] Erreur de connexion :', error.message);
-        console.log('[LOGIN] Nouvelle tentative dans 10 secondes...');
+        console.error('[DISCORD] Erreur de connexion :', error.message);
+        console.log('[DISCORD] Nouvelle tentative dans 10 secondes...');
         setTimeout(loginWithRetry, 10000);
     }
 }
