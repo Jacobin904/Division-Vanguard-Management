@@ -1,36 +1,65 @@
 'use strict';
 
 require('dotenv').config();
-
 const path = require('path');
 const fs = require('fs');
-const http = require('http');
 const express = require('express');
-const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const passport = require('passport');
+const DiscordStrategy = require('passport-discord').Strategy;
+const fetch = require('node-fetch');
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 
-const voice = require('./utils/voiceManager');
-const clientStatus = require('./events/clientStatus');
+// ============================================================================
+// VÉRIFICATION DES VARIABLES D'ENVIRONNEMENT
+// ============================================================================
 
-const GUILD_ID = '1501671610879312036';
-const CODE_ACCES = '3057';
-const PORT = Number(process.env.PORT) || 3000;
-const SECRET_COOKIE = process.env.SESSION_SECRET || 'division-vanguard-change-ce-secret';
-const NOM_COOKIE = 'dv_acces';
-const DUREE_COOKIE = 12 * 60 * 60 * 1000;
+const variablesManquantes = [];
 
-const TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN;
+if (!process.env.DISCORD_BOT_TOKEN) {
+    variablesManquantes.push('DISCORD_BOT_TOKEN');
+}
 
-if (!TOKEN) {
-    console.error('[ERREUR] Aucun token trouvé. Définis DISCORD_BOT_TOKEN dans les variables d\'environnement.');
+if (!process.env.DISCORD_CLIENT_ID) {
+    variablesManquantes.push('DISCORD_CLIENT_ID');
+}
+
+if (!process.env.DISCORD_CLIENT_SECRET) {
+    variablesManquantes.push('DISCORD_CLIENT_SECRET');
+}
+
+if (!process.env.DISCORD_REDIRECT_URI) {
+    variablesManquantes.push('DISCORD_REDIRECT_URI');
+}
+
+if (variablesManquantes.length > 0) {
+    console.error('='.repeat(70));
+    console.error('[ERREUR CRITIQUE] Variables d\'environnement manquantes:');
+    variablesManquantes.forEach(v => console.error(`  - ${v}`));
+    console.error('');
+    console.error('Allez sur Render > Environment > Add Environment Variable');
+    console.error('et ajoutez toutes les variables listées ci-dessus.');
+    console.error('='.repeat(70));
     process.exit(1);
 }
 
-const ROLES_STAFF = [
-    '1502329914224017710', '1502321921113460827', '1502321894462980257', '1502321920652345484'
+console.log('[CONFIG] Toutes les variables d\'environnement sont présentes.');
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const GUILD_ID = '1501671610879312036';
+const MOT_DE_PASSE_SITE = '3057';
+
+const ROLE_STAFF = [
+    '1502329914224017710', // Fondation
+    '1502321921113460827', // Admin Interne
+    '1502321894462980257', // Manager de Communauté
+    '1502321920652345484'  // Directeur
 ];
 
-const ROLES_MILITAIRES = [
+const ROLE_MILITAIRE = [
     '1502321913169707089', '1502321912314073251', '1502321911433138387', '1502321910665580745',
     '1502321909596033156', '1502321908966887424', '1502321908182552647', '1502321907431637132',
     '1502321906353701025', '1569021434125357056', '1502321905212985475', '1502321904026124438',
@@ -39,7 +68,7 @@ const ROLES_MILITAIRES = [
     '1502321896212009001', '1502472415127666780'
 ];
 
-const ROLES_AUTORISES = [...ROLES_STAFF, ...ROLES_MILITAIRES];
+const ROLES_AUTORISES = [...ROLE_STAFF, ...ROLE_MILITAIRE];
 
 // ============================================================================
 // CLIENT DISCORD
@@ -61,214 +90,208 @@ const client = new Client({
 
 client.commands = new Collection();
 
-const dossierCommandes = path.join(__dirname, 'commands');
-
-for (const fichier of fs.readdirSync(dossierCommandes).filter((f) => f.endsWith('.js'))) {
+const commandsPath = path.join(__dirname, 'commands');
+for (const file of fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'))) {
     try {
-        const commande = require(path.join(dossierCommandes, fichier));
-        if (!commande?.data || !commande?.execute) continue;
-        client.commands.set(commande.data.name, commande);
-        console.log(`[COMMANDE] ${commande.data.name} chargée.`);
-    } catch (erreur) {
-        console.error(`[COMMANDE] ${fichier} : ${erreur.message}`);
-    }
-}
-
-const dossierEvenements = path.join(__dirname, 'events');
-
-for (const fichier of fs.readdirSync(dossierEvenements).filter((f) => f.endsWith('.js') && f !== 'clientStatus.js')) {
-    try {
-        const evenement = require(path.join(dossierEvenements, fichier));
-        if (!evenement?.name || !evenement?.execute) continue;
-
-        if (evenement.once) {
-            client.once(evenement.name, (...args) => evenement.execute(...args, client));
-        } else {
-            client.on(evenement.name, (...args) => evenement.execute(...args, client));
+        const command = require(path.join(commandsPath, file));
+        if ('data' in command && 'execute' in command) {
+            client.commands.set(command.data.name, command);
         }
-
-        console.log(`[ÉVÉNEMENT] ${evenement.name} chargé.`);
-    } catch (erreur) {
-        console.error(`[ÉVÉNEMENT] ${fichier} : ${erreur.message}`);
+    } catch (error) {
+        console.error(`[BOT] Erreur chargement ${file} :`, error);
     }
 }
 
-clientStatus.registerAll(client);
+const eventsPath = path.join(__dirname, 'events');
+for (const file of fs.readdirSync(eventsPath).filter(f => f.endsWith('.js') && f !== 'clientStatus.js')) {
+    try {
+        const event = require(path.join(eventsPath, file));
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args, client));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args, client));
+        }
+    } catch (error) {
+        console.error(`[BOT] Erreur chargement événement ${file} :`, error);
+    }
+}
 
-process.on('uncaughtException', (erreur) => {
-    console.error(`[ERREUR] ${erreur.stack || erreur.message}`);
-});
+process.on('SIGTERM', () => console.log('[SIGNAL] SIGTERM ignoré.'));
+process.on('SIGINT', () => console.log('[SIGNAL] SIGINT ignoré.'));
 
-process.on('unhandledRejection', (raison) => {
-    console.error(`[PROMESSE] ${raison instanceof Error ? raison.message : raison}`);
-});
+client.login(process.env.DISCORD_BOT_TOKEN)
+    .then(() => console.log('[BOT] Connexion Discord réussie.'))
+    .catch(err => {
+        console.error('[BOT] Échec de connexion Discord :', err.message);
+        process.exit(1);
+    });
 
 // ============================================================================
-// PORTAIL WEB — COOKIE SIGNÉ, AUCUNE SESSION EN MÉMOIRE
+// SERVEUR WEB
 // ============================================================================
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser(SECRET_COOKIE));
 
-function identifiantSession(req) {
-    const valeur = req.signedCookies?.[NOM_COOKIE];
-    if (!valeur || typeof valeur !== 'string') return null;
-    if (!/^\d{17,20}$/.test(valeur)) return null;
-    return valeur;
-}
-
-async function recupererMembre(id) {
-    const guild = client.guilds.cache.get(GUILD_ID);
-    if (!guild) return null;
-
-    try {
-        return await guild.members.fetch(id);
-    } catch {
-        return null;
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'secret_par_defaut_change_le',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: true,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000
     }
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ============================================================================
+// STRATÉGIE D'AUTHENTIFICATION DISCORD
+// ============================================================================
+
+try {
+    passport.use(new DiscordStrategy({
+        clientID: process.env.DISCORD_CLIENT_ID,
+        clientSecret: process.env.DISCORD_CLIENT_SECRET,
+        callbackURL: process.env.DISCORD_REDIRECT_URI,
+        scope: ['identify', 'guilds']
+    }, async (accessToken, refreshToken, profile, done) => {
+        try {
+            console.log(`[AUTH] Tentative de connexion de ${profile.username} (${profile.id})`);
+
+            const response = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/${profile.id}`, {
+                headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}` }
+            });
+
+            if (!response.ok) {
+                console.log(`[AUTH] Utilisateur ${profile.username} non trouvé sur le serveur.`);
+                return done(null, false, { message: 'Utilisateur non trouvé sur le serveur.' });
+            }
+
+            const member = await response.json();
+            const aUnRoleAutorise = member.roles.some(role => ROLES_AUTORISES.includes(role));
+
+            if (!aUnRoleAutorise) {
+                console.log(`[AUTH] Utilisateur ${profile.username} n'a pas les rôles requis.`);
+                return done(null, false, { message: 'Accès refusé : Rôle insuffisant.' });
+            }
+
+            console.log(`[AUTH] Utilisateur ${profile.username} authentifié avec succès.`);
+
+            return done(null, {
+                id: profile.id,
+                username: profile.username,
+                discriminator: profile.discriminator,
+                avatar: profile.avatar,
+                roles: member.roles
+            });
+        } catch (error) {
+            console.error('[AUTH] Erreur lors de la vérification des rôles :', error);
+            return done(error, null);
+        }
+    }));
+
+    passport.serializeUser((user, done) => done(null, user));
+    passport.deserializeUser((obj, done) => done(null, obj));
+
+    console.log('[AUTH] Stratégie Discord OAuth2 configurée.');
+} catch (error) {
+    console.error('[AUTH] Erreur configuration OAuth2 :', error.message);
+    process.exit(1);
 }
 
-function estAutorise(membre) {
-    if (!membre) return false;
-    return membre.roles.cache.some((role) => ROLES_AUTORISES.includes(role.id));
-}
-
-app.get('/health', (req, res) => res.status(200).send('OK'));
+// ============================================================================
+// ROUTES
+// ============================================================================
 
 app.get('/', (req, res) => {
-    if (identifiantSession(req)) return res.redirect('/dashboard');
+    if (req.session.passwordVerified && req.isAuthenticated()) {
+        return res.redirect('/dashboard');
+    }
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.post('/verify', async (req, res) => {
-    const code = String(req.body.password || '').trim();
-    const identifiant = String(req.body.discordId || '').trim();
-
-    if (code !== CODE_ACCES) {
-        return res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
+app.post('/verify-password', (req, res) => {
+    if (req.body.password === MOT_DE_PASSE_SITE) {
+        req.session.passwordVerified = true;
+        console.log('[WEB] Mot de passe vérifié avec succès.');
+        res.redirect('/auth/discord');
+    } else {
+        console.log('[WEB] Mot de passe incorrect.');
+        res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
     }
-
-    if (!/^\d{17,20}$/.test(identifiant)) {
-        return res.status(400).send('Identifiant Discord invalide. Il doit contenir entre 17 et 20 chiffres.');
-    }
-
-    if (!client.isReady()) {
-        return res.status(503).send('Le service Discord démarre. Réessaie dans quelques secondes.');
-    }
-
-    const membre = await recupererMembre(identifiant);
-
-    if (!estAutorise(membre)) {
-        return res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
-    }
-
-    res.cookie(NOM_COOKIE, identifiant, {
-        signed: true,
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        maxAge: DUREE_COOKIE
-    });
-
-    console.log(`[WEB] Accès accordé à ${membre.user.username} (${identifiant}).`);
-    res.redirect('/dashboard');
 });
 
-app.get('/dashboard', async (req, res) => {
-    const identifiant = identifiantSession(req);
-    if (!identifiant) return res.redirect('/');
-
-    const membre = await recupererMembre(identifiant);
-
-    if (!estAutorise(membre)) {
-        res.clearCookie(NOM_COOKIE);
-        return res.status(403).sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
+app.get('/auth/discord', (req, res, next) => {
+    if (!req.session.passwordVerified) {
+        return res.redirect('/');
     }
+    passport.authenticate('discord')(req, res, next);
+});
 
-    const roles = membre.roles.cache
-        .filter((r) => r.id !== GUILD_ID)
+app.get('/auth/discord/callback', 
+    passport.authenticate('discord', { 
+        failureRedirect: '/unauthorized',
+        failureMessage: true
+    }), 
+    (req, res) => {
+        console.log(`[WEB] Redirection vers le dashboard après authentification.`);
+        res.redirect('/dashboard');
+    }
+);
+
+app.get('/dashboard', (req, res) => {
+    if (!req.session.passwordVerified || !req.isAuthenticated()) {
+        console.log('[WEB] Tentative d\'accès au dashboard sans session valide.');
+        return res.redirect('/');
+    }
+    
+    const guild = client.guilds.cache.get(GUILD_ID);
+    const member = guild ? guild.members.cache.get(req.user.id) : null;
+    
+    const userRoles = member ? member.roles.cache
+        .filter(r => r.id !== GUILD_ID)
         .sort((a, b) => b.position - a.position)
-        .map((r) => ({ name: r.name, color: r.hexColor }));
+        .map(r => ({ name: r.name, color: r.hexColor }))
+        : [];
 
-    res.render('dashboard', {
-        user: {
-            id: membre.id,
-            username: membre.user.username,
-            discriminator: membre.user.discriminator,
-            avatarURL: membre.user.displayAvatarURL({ size: 256, extension: 'png' })
-        },
-        roles,
-        guild: {
-            name: membre.guild.name,
-            memberCount: membre.guild.memberCount,
-            boostLevel: membre.guild.premiumTier,
-            boostCount: membre.guild.premiumSubscriptionCount || 0
-        }
+    const guildInfo = guild ? {
+        name: guild.name,
+        memberCount: guild.memberCount,
+        boostLevel: guild.premiumTier,
+        boostCount: guild.premiumSubscriptionCount || 0
+    } : null;
+
+    res.render('dashboard', { 
+        user: req.user, 
+        roles: userRoles, 
+        guild: guildInfo 
     });
+});
+
+app.get('/unauthorized', (req, res) => {
+    req.session.destroy();
+    res.sendFile(path.join(__dirname, 'public', 'unauthorized.html'));
 });
 
 app.get('/logout', (req, res) => {
-    res.clearCookie(NOM_COOKIE);
+    req.session.destroy();
     res.redirect('/');
 });
 
-const serveur = http.createServer(app);
+// ============================================================================
+// DÉMARRAGE DU SERVEUR
+// ============================================================================
 
-serveur.listen(PORT, () => {
-    console.log(`[WEB] Portail sécurisé actif sur le port ${PORT}.`);
+app.listen(PORT, () => {
+    console.log(`[WEB] Portail sécurisé actif sur le port ${PORT}`);
+    console.log(`[WEB] URL publique : https://division-vanguard-management.canner.app`);
 });
-
-// ============================================================================
-// CONNEXION DISCORD
-// ============================================================================
-
-let tentativesConnexion = 0;
-
-async function connecterDiscord() {
-    try {
-        await client.login(TOKEN);
-        tentativesConnexion = 0;
-    } catch (erreur) {
-        tentativesConnexion += 1;
-        const delai = Math.min(10000 * tentativesConnexion, 120000);
-        console.error(`[AUTHENTIFICATION] ${erreur.message}`);
-        console.log(`[AUTHENTIFICATION] Nouvel essai dans ${delai / 1000} secondes.`);
-        setTimeout(connecterDiscord, delai);
-    }
-}
-
-connecterDiscord();
-
-// ============================================================================
-// ARRÊT PROPRE — INDISPENSABLE POUR ÉVITER LES INSTANCES FANTÔMES
-// ============================================================================
-
-let arretEnCours = false;
-
-async function arreter(signal) {
-    if (arretEnCours) return;
-    arretEnCours = true;
-
-    console.log(`[ARRÊT] Signal ${signal} reçu. Fermeture propre.`);
-
-    try { voice.arreter(); } catch {}
-
-    serveur.close(() => console.log('[WEB] Serveur fermé.'));
-
-    try {
-        await client.destroy();
-        console.log('[DISCORD] Session fermée.');
-    } catch {}
-
-    setTimeout(() => process.exit(0), 500);
-}
-
-process.on('SIGTERM', () => arreter('SIGTERM'));
-process.on('SIGINT', () => arreter('SIGINT'));
