@@ -1,9 +1,8 @@
 {
-  "name": "discord-server-info-bot",
+  "name": "division-vanguard-management",
   "version": "1.0.0",
-  "description": "Bot qui récupère toutes les infos d'un serveur Discord",
+  "description": "Bot de gestion pour Division Vanguard",
   "main": "index.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node deploy-commands.js && node index.js",
     "deploy": "node deploy-commands.js"
@@ -14,5 +13,8 @@
     "@discordjs/voice": "^0.16.1",
     "@discordjs/opus": "^0.9.0",
     "sodium-native": "^4.0.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
