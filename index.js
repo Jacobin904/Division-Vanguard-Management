@@ -14,18 +14,16 @@ const http = require('http');
 const PORT = process.env.PORT || 3000;
 
 const server = http.createServer((req, res) => {
-    if (req.url === '/health' || req.url === '/') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('OK');
-    } else {
-        res.writeHead(404);
-        res.end();
-    }
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
 });
 
 server.listen(PORT, () => {
     console.log(`[HTTP] Serveur de health check actif sur le port ${PORT}`);
 });
+
+// Garder le serveur actif
+server.keepAlive = true;
 
 // ============================================================================
 // CLIENT DISCORD
@@ -131,12 +129,24 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // ============================================================================
-// ARRÊT PROPRE
+// ARRÊT PROPRE - IGNORE LES SIGTERM DE RENDER
 // ============================================================================
 
 let isShuttingDown = false;
+let lastSigterm = 0;
 
 function gracefulShutdown(signal) {
+    const now = Date.now();
+    
+    // Si on reçoit un SIGTERM dans les 5 dernières secondes, c'est probablement Render qui redémarre
+    // On ignore pour éviter les redémarrages en boucle
+    if (signal === 'SIGTERM' && (now - lastSigterm) < 5000) {
+        console.log('[ARRÊT] SIGTERM ignoré (redémarrage Render détecté)');
+        return;
+    }
+    
+    lastSigterm = now;
+    
     if (isShuttingDown) return;
     isShuttingDown = true;
     
@@ -167,7 +177,12 @@ function gracefulShutdown(signal) {
     }, 10000);
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+// Ne pas réagir aux SIGTERM de Render
+process.on('SIGTERM', () => {
+    console.log('[SIGTERM] Signal reçu, mais ignoré pour maintenir le bot en ligne');
+    // Ne pas appeler gracefulShutdown
+});
+
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // ============================================================================
@@ -186,6 +201,16 @@ async function loginWithRetry() {
 }
 
 loginWithRetry();
+
+// ============================================================================
+// KEEP-ALIVE : PING RÉGULIER POUR GARDER LE PROCESSUS ACTIF
+// ============================================================================
+
+setInterval(() => {
+    if (client.isReady()) {
+        console.log(`[KEEP-ALIVE] Bot actif - Ping: ${client.ws.ping}ms`);
+    }
+}, 300000); // Toutes les 5 minutes
 
 process.on('exit', (code) => {
     console.log(`[PROCESS] Processus terminé avec le code ${code}.`);
