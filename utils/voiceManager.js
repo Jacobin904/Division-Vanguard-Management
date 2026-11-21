@@ -3,184 +3,234 @@
 const {
     joinVoiceChannel,
     entersState,
+    getVoiceConnection,
     VoiceConnectionStatus,
-    getVoiceConnection
+    generateDependencyReport
 } = require('@discordjs/voice');
 
-const config = require('../config/guildConfig');
+const { ChannelType, PermissionFlagsBits } = require('discord.js');
 
-const SALON_VOCAL_GENERAL = '1502321987056566412';
-const MAX_TENTATIVES = 3;
+const SALON_VOCAL_ID = '1502321987056566412';
+const GUILD_ID = '1501671610879312036';
 
-let connection = null;
-let tentativeReconnexion = 0;
-let surveillanceActive = false;
-let enCoursDeConnexion = false;
-let arretTentatives = false;
+const DELAI_BASE = 5000;
+const DELAI_PLAFOND = 60000;
+const INTERVALLE_SURVEILLANCE = 45000;
 
-async function connecterAuVocal(guild) {
-    if (arretTentatives) {
-        console.log('[VOCAL] Tentatives arrêtées après échecs multiples. Le vocal ne sera pas activé.');
-        return false;
-    }
+let clientDiscord = null;
+let connexion = null;
+let connexionEnCours = false;
+let arretDemande = false;
+let tentatives = 0;
+let minuteurReconnexion = null;
+let minuteurSurveillance = null;
+let gestionnairesInstalles = false;
 
-    if (enCoursDeConnexion) {
-        console.log('[VOCAL] Connexion déjà en cours, skip.');
-        return false;
-    }
-
-    enCoursDeConnexion = true;
-
-    try {
-        const salonVocal = guild.channels.cache.get(SALON_VOCAL_GENERAL);
-        
-        if (!salonVocal) {
-            console.error('[VOCAL] Salon vocal introuvable.');
-            enCoursDeConnexion = false;
-            return false;
-        }
-
-        if (salonVocal.type !== 2) {
-            console.error('[VOCAL] Le salon spécifié n\'est pas un salon vocal.');
-            enCoursDeConnexion = false;
-            return false;
-        }
-
-        const connexionExistante = getVoiceConnection(guild.id);
-        if (connexionExistante && connexionExistante.state.status !== VoiceConnectionStatus.Destroyed) {
-            console.log('[VOCAL] Déjà connecté au salon vocal.');
-            connection = connexionExistante;
-            enCoursDeConnexion = false;
-            tentativeReconnexion = 0;
-            return true;
-        }
-
-        console.log('[VOCAL] Tentative de connexion au salon vocal...');
-
-        connection = joinVoiceChannel({
-            channelId: SALON_VOCAL_GENERAL,
-            guildId: guild.id,
-            adapterCreator: guild.voiceAdapterCreator,
-            selfDeaf: true,
-            selfMute: true
-        });
-
-        await entersState(connection, VoiceConnectionStatus.Ready, 30000);
-        
-        console.log('[VOCAL] Connecté avec succès au salon vocal.');
-        tentativeReconnexion = 0;
-        enCoursDeConnexion = false;
-        
-        configurerGestionnaires(guild);
-        
-        return true;
-
-    } catch (erreur) {
-        console.error('[VOCAL] Erreur lors de la connexion vocale :', erreur.message);
-        
-        if (connection) {
-            try {
-                connection.destroy();
-            } catch (e) {}
-            connection = null;
-        }
-        
-        enCoursDeConnexion = false;
-        tentativeReconnexion++;
-        
-        if (tentativeReconnexion >= MAX_TENTATIVES) {
-            console.error(`[VOCAL] ${MAX_TENTATIVES} tentatives échouées. Arrêt des tentatives automatiques.`);
-            arretTentatives = true;
-        }
-        
-        return false;
-    }
+function journal(message) {
+    console.log(`[VOCAL] ${message}`);
 }
 
-function configurerGestionnaires(guild) {
-    if (!connection) return;
+function nettoyerConnexion() {
+    if (!connexion) return;
 
-    connection.on(VoiceConnectionStatus.Disconnected, async () => {
-        console.log('[VOCAL] Déconnecté du salon vocal.');
-        
-        if (arretTentatives) {
-            console.log('[VOCAL] Pas de reconnexion automatique (tentatives arrêtées).');
-            return;
+    try {
+        connexion.removeAllListeners();
+        if (connexion.state.status !== VoiceConnectionStatus.Destroyed) {
+            connexion.destroy();
         }
+    } catch (erreur) {
+        journal(`Nettoyage : ${erreur.message}`);
+    }
+
+    connexion = null;
+    gestionnairesInstalles = false;
+}
+
+function programmerReconnexion() {
+    if (arretDemande || minuteurReconnexion) return;
+
+    const delai = Math.min(DELAI_BASE * Math.pow(2, tentatives), DELAI_PLAFOND);
+    tentatives += 1;
+
+    journal(`Nouvelle tentative dans ${Math.round(delai / 1000)} secondes (essai ${tentatives}).`);
+
+    minuteurReconnexion = setTimeout(() => {
+        minuteurReconnexion = null;
+        connecter();
+    }, delai);
+}
+
+function installerGestionnaires() {
+    if (!connexion || gestionnairesInstalles) return;
+    gestionnairesInstalles = true;
+
+    connexion.on('stateChange', (ancien, nouveau) => {
+        journal(`État : ${ancien.status} vers ${nouveau.status}.`);
+
+        if (nouveau.status === VoiceConnectionStatus.Ready) {
+            tentatives = 0;
+            journal('Connexion vocale établie et stable.');
+        }
+    });
+
+    connexion.on(VoiceConnectionStatus.Disconnected, async (ancien, nouveau) => {
+        journal(`Déconnexion. Raison : ${nouveau?.reason ?? 'non précisée'}. Code : ${nouveau?.closeCode ?? 'aucun'}.`);
+
+        if (arretDemande) return;
 
         try {
             await Promise.race([
-                entersState(connection, VoiceConnectionStatus.Signalling, 5000),
-                entersState(connection, VoiceConnectionStatus.Connecting, 5000)
+                entersState(connexion, VoiceConnectionStatus.Signalling, 5000),
+                entersState(connexion, VoiceConnectionStatus.Connecting, 5000)
             ]);
-            console.log('[VOCAL] Reconnexion en cours...');
-        } catch (erreur) {
-            console.log('[VOCAL] Reconnexion impossible.');
-            try {
-                connection.destroy();
-            } catch (e) {}
-            connection = null;
-            
-            tentativeReconnexion++;
-            if (tentativeReconnexion >= MAX_TENTATIVES) {
-                arretTentatives = true;
-                console.error('[VOCAL] Arrêt des tentatives après reconnexion échouée.');
+            journal('Reprise de la session vocale en cours.');
+        } catch {
+            journal('Reprise impossible. Reconstruction de la connexion.');
+            nettoyerConnexion();
+            programmerReconnexion();
+        }
+    });
+
+    connexion.on(VoiceConnectionStatus.Destroyed, () => {
+        journal('Connexion détruite.');
+        connexion = null;
+        gestionnairesInstalles = false;
+        programmerReconnexion();
+    });
+
+    connexion.on('error', (erreur) => {
+        journal(`Erreur : ${erreur.message}`);
+    });
+}
+
+async function connecter() {
+    if (arretDemande || connexionEnCours) return false;
+
+    connexionEnCours = true;
+
+    try {
+        const guild = clientDiscord?.guilds.cache.get(GUILD_ID)
+            || await clientDiscord?.guilds.fetch(GUILD_ID).catch(() => null);
+
+        if (!guild) {
+            journal('Serveur introuvable.');
+            return false;
+        }
+
+        const salon = guild.channels.cache.get(SALON_VOCAL_ID)
+            || await guild.channels.fetch(SALON_VOCAL_ID).catch(() => null);
+
+        if (!salon) {
+            journal(`Le salon ${SALON_VOCAL_ID} est introuvable.`);
+            return false;
+        }
+
+        if (salon.type !== ChannelType.GuildVoice && salon.type !== ChannelType.GuildStageVoice) {
+            journal(`Le salon « ${salon.name} » n'est pas un salon vocal.`);
+            return false;
+        }
+
+        const droits = salon.permissionsFor(guild.members.me);
+
+        if (!droits?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect])) {
+            journal(`Permissions insuffisantes dans « ${salon.name} » : Voir le salon et Se connecter sont requises.`);
+            return false;
+        }
+
+        const existante = getVoiceConnection(guild.id);
+
+        if (existante && existante.state.status !== VoiceConnectionStatus.Destroyed) {
+            connexion = existante;
+            installerGestionnaires();
+
+            if (existante.joinConfig.channelId !== SALON_VOCAL_ID) {
+                journal('Mauvais salon détecté. Déplacement vers le salon général.');
+                existante.rejoin({ channelId: SALON_VOCAL_ID, selfDeaf: true, selfMute: true });
             }
-        }
-    });
 
-    connection.on(VoiceConnectionStatus.Destroyed, () => {
-        console.log('[VOCAL] Connexion vocale détruite.');
-        connection = null;
-    });
+            if (existante.state.status === VoiceConnectionStatus.Ready) {
+                tentatives = 0;
+                return true;
+            }
+        } else {
+            journal(`Connexion au salon « ${salon.name} ».`);
 
-    connection.on(VoiceConnectionStatus.Ready, () => {
-        console.log('[VOCAL] Connexion vocale active.');
-        tentativeReconnexion = 0;
-    });
+            connexion = joinVoiceChannel({
+                channelId: SALON_VOCAL_ID,
+                guildId: guild.id,
+                adapterCreator: guild.voiceAdapterCreator,
+                selfDeaf: true,
+                selfMute: true,
+                debug: process.env.VOCAL_DEBUG === 'true'
+            });
 
-    connection.on('error', (erreur) => {
-        console.error('[VOCAL] Erreur :', erreur.message);
-    });
-}
-
-function demarrerSurveillance(client) {
-    if (surveillanceActive) return;
-    
-    surveillanceActive = true;
-    console.log('[VOCAL] Surveillance activée (vérification toutes les 10 minutes).');
-
-    setInterval(async () => {
-        if (arretTentatives) {
-            return;
+            installerGestionnaires();
         }
 
-        const guild = client.guilds.cache.get(config.guildId);
-        if (!guild) return;
+        await entersState(connexion, VoiceConnectionStatus.Ready, 30000);
+        tentatives = 0;
+        return true;
 
-        const connexionActuelle = getVoiceConnection(guild.id);
-        
-        if (!connexionActuelle || connexionActuelle.state.status === VoiceConnectionStatus.Destroyed) {
-            console.log('[VOCAL] Connexion inactive, tentative de reconnexion...');
-            await connecterAuVocal(guild);
-        }
-    }, 600000);
-}
+    } catch (erreur) {
+        journal(`Échec de la poignée de main vocale : ${erreur.message}`);
+        nettoyerConnexion();
+        programmerReconnexion();
+        return false;
 
-function deconnecter() {
-    if (connection) {
-        try {
-            connection.destroy();
-            connection = null;
-            console.log('[VOCAL] Déconnecté.');
-        } catch (erreur) {
-            console.error('[VOCAL] Erreur déconnexion :', erreur.message);
-        }
+    } finally {
+        connexionEnCours = false;
     }
 }
 
-module.exports = {
-    connecterAuVocal,
-    deconnecter,
-    demarrerSurveillance
-};
+function initialiser(client) {
+    clientDiscord = client;
+    arretDemande = false;
+
+    console.log('========== RAPPORT DE DÉPENDANCES VOCALES ==========');
+    console.log(generateDependencyReport());
+    console.log('====================================================');
+
+    connecter();
+
+    if (minuteurSurveillance) clearInterval(minuteurSurveillance);
+
+    minuteurSurveillance = setInterval(() => {
+        if (arretDemande || connexionEnCours) return;
+
+        const actuelle = getVoiceConnection(GUILD_ID);
+
+        if (!actuelle || actuelle.state.status === VoiceConnectionStatus.Destroyed) {
+            journal('Surveillance : aucune connexion active. Reconnexion.');
+            nettoyerConnexion();
+            connecter();
+            return;
+        }
+
+        if (actuelle.state.status === VoiceConnectionStatus.Ready
+            && actuelle.joinConfig.channelId !== SALON_VOCAL_ID) {
+            journal('Surveillance : mauvais salon. Correction.');
+            actuelle.rejoin({ channelId: SALON_VOCAL_ID, selfDeaf: true, selfMute: true });
+        }
+    }, INTERVALLE_SURVEILLANCE);
+
+    journal('Surveillance vocale activée.');
+}
+
+function arreter() {
+    arretDemande = true;
+
+    if (minuteurReconnexion) {
+        clearTimeout(minuteurReconnexion);
+        minuteurReconnexion = null;
+    }
+
+    if (minuteurSurveillance) {
+        clearInterval(minuteurSurveillance);
+        minuteurSurveillance = null;
+    }
+
+    nettoyerConnexion();
+    journal('Service vocal arrêté proprement.');
+}
+
+module.exports = { initialiser, connecter, arreter };
