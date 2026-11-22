@@ -636,7 +636,7 @@ function detecterModele(salon, guild) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('fixperms')
-        .setDescription('Applique les permissions officielles de tous les salons.')
+        .setDescription('Réinitialise les permissions des salons selon le protocole (Admin uniquement)')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .setDMPermission(false),
 
