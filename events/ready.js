@@ -1,28 +1,32 @@
 'use strict';
 
 const { Events, ActivityType } = require('discord.js');
-const { initialize } = require('../utils/keepAlive');
-const voice = require('../utils/voiceManager');
+const { connecterVocal } = require('../utils/voiceManager');
 
 module.exports = {
     name: Events.ClientReady,
     once: true,
-
     async execute(client) {
         console.log('============================================================');
-        console.log(`[BOT] Session ouverte : ${client.user.tag}`);
-        console.log(`[BOT] Identifiant : ${client.user.id}`);
-        console.log(`[BOT] Serveurs desservis : ${client.guilds.cache.size}`);
-        console.log(`[BOT] Horodatage : ${new Date().toISOString()}`);
+        console.log(`[BOT] Connecté en tant que : ${client.user.tag}`);
+        console.log(`[BOT] ID : ${client.user.id}`);
+        console.log(`[BOT] Serveurs : ${client.guilds.cache.size}`);
         console.log('============================================================');
 
-        initialize(client);
-
+        // Statut fixe
         client.user.setPresence({
             activities: [{ name: '.gg/division-vanguard', type: ActivityType.Playing }],
             status: 'online'
         });
 
-        setTimeout(() => voice.initialiser(client), 5000);
+        // On attend 5 secondes pour être sûr que tous les salons sont en cache
+        setTimeout(() => {
+            const guild = client.guilds.cache.get('1501671610879312036');
+            if (guild) {
+                connecterVocal(guild);
+            } else {
+                console.error('[VOCAL] ERREUR : Serveur principal introuvable dans le cache.');
+            }
+        }, 5000);
     }
 };
