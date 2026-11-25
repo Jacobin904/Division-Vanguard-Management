@@ -43,4 +43,29 @@ async function logAction(client, { title, description, color = COULEURS.informat
     return sendToChannel(client, config.channels.logsBot, { embed });
 }
 
+async function envoyerLog(client, options) {
+    try {
+        const config = require('../config/guildConfig');
+        const salon = client.channels.cache.get(config.channels.logsBot);
+        
+        if (!salon) return;
+
+        const embed = new EmbedBuilder()
+            .setTitle(options.titre)
+            .setDescription(options.description)
+            .setColor(options.couleur || 0x3498DB)
+            .setTimestamp();
+
+        if (options.champs) {
+            embed.addFields(options.champs);
+        }
+
+        await salon.send({ embeds: [embed] });
+    } catch (erreur) {
+        console.error('[LOG] Erreur envoi log :', erreur.message);
+    }
+}
+
+module.exports.envoyerLog = envoyerLog;
+
 module.exports = { logAction, sendToChannel, recupererSalon };
