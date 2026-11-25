@@ -19,7 +19,16 @@ function structureInitiale() {
             },
             liens: {
                 actif: true,
-                whitelist: ['discord.gg/division-vanguard'],
+                whitelist: [
+                    'discord.gg/division-vanguard',
+                    'discord.com',
+                    'youtube.com',
+                    'youtu.be',
+                    'twitch.tv',
+                    'github.com',
+                    'google.com',
+                    'google.fr'
+                ],
                 action: 'delete'
             },
             mentions: {
@@ -30,7 +39,50 @@ function structureInitiale() {
             },
             motsInterdits: {
                 actif: true,
-                mots: [],
+                mots: [
+                    'fdp',
+                    'pute',
+                    'connard',
+                    'merde',
+                    'salope',
+                    'enculé',
+                    'encule',
+                    'nique',
+                    'ntm',
+                    'pétasse',
+                    'petasse',
+                    'couille',
+                    'couilles',
+                    'bite',
+                    'couille',
+                    'chier',
+                    'chié',
+                    'con',
+                    'conne',
+                    'abruti',
+                    'abrutie',
+                    'debile',
+                    'débile',
+                    'idiot',
+                    'idiote',
+                    'stupide',
+                    'imbecile',
+                    'imbécile',
+                    'tg',
+                    'ta gueule',
+                    'ferme la',
+                    'ferme-la',
+                    'nazi',
+                    'hitler',
+                    'raciste',
+                    'raciste',
+                    'pedophile',
+                    'pédophile',
+                    'terroriste',
+                    'kill yourself',
+                    'kys',
+                    'suicide'
+                ],
                 action: 'delete'
             },
             caps: {
@@ -39,7 +91,12 @@ function structureInitiale() {
                 longueurMin: 10,
                 action: 'delete'
             },
-            exemptions: []
+            exemptions: [
+                '1502329914224017710', // Fondation
+                '1502321921113460827', // Admin Interne
+                '1502321894462980257', // Manager de Communauté
+                '1502321920652345484'  // Directeur
+            ]
         },
         antiraid: {
             actif: true,
@@ -50,7 +107,7 @@ function structureInitiale() {
             },
             comptesRecents: {
                 actif: true,
-                ageMin: 86400000,
+                ageMin: 86400000, // 24 heures en millisecondes
                 action: 'kick'
             },
             lockdown: {
@@ -76,8 +133,10 @@ function charger() {
             fs.mkdirSync(DOSSIER_DONNEES, { recursive: true });
         }
         if (!fs.existsSync(FICHIER_BDD)) {
-            fs.writeFileSync(FICHIER_BDD, JSON.stringify(structureInitiale(), null, 2), 'utf8');
-            return structureInitiale();
+            const configInitiale = structureInitiale();
+            fs.writeFileSync(FICHIER_BDD, JSON.stringify(configInitiale, null, 2), 'utf8');
+            console.log('[BDD] Base de données initialisée avec la configuration par défaut.');
+            return configInitiale;
         }
         const brut = JSON.parse(fs.readFileSync(FICHIER_BDD, 'utf8'));
         return { ...structureInitiale(), ...brut };
