@@ -3,188 +3,79 @@
 const {
     SlashCommandBuilder,
     PermissionFlagsBits,
-    ChannelType,
-    AttachmentBuilder
+    ChannelType
 } = require('discord.js');
 
 // ============================================================================
-// IDENTIFIANTS DES RÔLES — DIVISION VANGUARD
+// CONFIGURATION DES RÔLES
 // ============================================================================
 
 const ROLES = {
     STAFF: [
         '1502329914224017710', // Fondation
-        '1502321921113460827', // Admin interne
-        '1502321894462980257', // Manager de communauté
+        '1502321921113460827', // Admin Interne
+        '1502321894462980257', // Manager de Communauté
         '1502321920652345484'  // Directeur
     ],
-
-    OFFICIERS_GENERAUX: [
-        '1502321913169707089', // Général d'armée
-        '1502321912314073251', // Général de corps d'armée
-        '1502321911433138387', // Général de division
-        '1502321910665580745'  // Général de brigade
-    ],
-
-    OFFICIERS_SUPERIEURS: [
+    OFFICIER: [
+        '1502321913169707089', // Général Armée
+        '1502321912314073251', // Général de Corps Armée
+        '1502321911433138387', // Général de Division
+        '1502321910665580745', // Général de Brigade
         '1502321909596033156', // Colonel
-        '1502321908966887424', // Lieutenant-colonel
-        '1502321908182552647'  // Commandant
-    ],
-
-    OFFICIERS_SUBALTERNES: [
+        '1502321908966887424', // Lieutenant-Colonel
+        '1502321908182552647', // Commandant
         '1502321907431637132', // Capitaine
         '1502321906353701025', // Lieutenant
         '1569021434125357056', // Sous-lieutenant
         '1502321905212985475'  // Aspirant
     ],
-
-    SOUS_OFFICIERS: [
+    SOUS_OFFICIER: [
         '1502321904026124438', // Major
-        '1502321903333806225', // Adjudant-chef
+        '1502321903333806225', // Adjudant-Chef
         '1502321902020984842', // Adjudant
-        '1502321900779737200', // Sergent-chef
+        '1502321900779737200', // Sergent-Chef
         '1502321899751866550'  // Sergent
     ],
-
-    MILITAIRES_DU_RANG: [
-        '1569022303034146886', // Caporal-chef de première classe
+    MILITAIRE: [
+        '1569022303034146886', // Caporal-chef de 1re classe
         '1502321898350972980', // Caporal-chef
         '1502321897147203654', // Caporal
-        '1569022882288378017', // Soldat de première classe
+        '1569022882288378017', // Soldat de 1re classe
         '1502321896212009001', // Soldat
-        '1502472415127666780'  // Engagé volontaire initial
+        '1502472415127666780'  // Engagé Volontaire Initial
     ],
-
-    PILOTES: [
+    SPECIALITES: [
         '1502321914516078652', // Pilote
-        '1502321915962986516'  // Pilote chef
+        '1502321915962986516', // Pilote Chef
+        '1502321916692926695', // Opérateur Mission
+        '1502321917535715328', // Forces Spéciales
+        '1502321918387425450', // Médecin
+        '1502321919662493758'  // Sniper Élite
     ],
-
-    FORCES_SPECIALES: [
-        '1502321917535715328'  // Forces spéciales
-    ],
-
-    MEDECINS: [
-        '1502321918387425450'  // Médecin
-    ],
-
-    SNIPERS: [
-        '1502321919662493758'  // Sniper élite
-    ],
-
-    OPERATEURS_MISSION: [
-        '1502321916692926695'  // Opérateur mission
-    ],
-
     CIRFA: [
         '1503124531391365203', // CIRFA
         '1507547514264485969', // CIRFA spécialité
-        '1504628622969798787'  // Centre d'information et de recrutement des Forces armées
+        '1504628622969798787'  // Centre d'Information et de Recrutement
     ],
-
-    NOUVEAUX_ARRIVANTS: '1503483501113249792'
+    NOUVEAUX_ARRIVANTS: '1503483501113249792',
+    BOT: '1503484181735276605'
 };
 
-const GROUPES = {
-    STAFF: ROLES.STAFF,
-
-    HAUT_COMMANDEMENT: [
-        ...ROLES.STAFF,
-        ...ROLES.OFFICIERS_GENERAUX,
-        ...ROLES.OFFICIERS_SUPERIEURS
-    ],
-
-    OFFICIERS: [
-        ...ROLES.OFFICIERS_GENERAUX,
-        ...ROLES.OFFICIERS_SUPERIEURS,
-        ...ROLES.OFFICIERS_SUBALTERNES
-    ],
-
-    MILITAIRES: [
-        ...ROLES.OFFICIERS_GENERAUX,
-        ...ROLES.OFFICIERS_SUPERIEURS,
-        ...ROLES.OFFICIERS_SUBALTERNES,
-        ...ROLES.SOUS_OFFICIERS,
-        ...ROLES.MILITAIRES_DU_RANG
-    ],
-
-    SPECIALITES: [
-        ...ROLES.PILOTES,
-        ...ROLES.FORCES_SPECIALES,
-        ...ROLES.MEDECINS,
-        ...ROLES.SNIPERS,
-        ...ROLES.OPERATEURS_MISSION
-    ]
-};
-
-// ============================================================================
-// PERMISSIONS DE BASE
-// ============================================================================
-
-const PERMISSIONS = {
-    LECTURE_TEXTE: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.ReadMessageHistory
-    ],
-
-    ECRITURE_TEXTE: [
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.SendMessagesInThreads,
-        PermissionFlagsBits.CreatePublicThreads,
-        PermissionFlagsBits.CreatePrivateThreads,
-        PermissionFlagsBits.AttachFiles,
-        PermissionFlagsBits.EmbedLinks,
-        PermissionFlagsBits.AddReactions,
-        PermissionFlagsBits.UseApplicationCommands
-    ],
-
-    MODERATION_TEXTE: [
-        PermissionFlagsBits.ManageMessages,
-        PermissionFlagsBits.ManageThreads,
-        PermissionFlagsBits.ModerateMembers
-    ],
-
-    GESTION_SALON: [
-        PermissionFlagsBits.ManageChannels
-    ],
-
-    LECTURE_VOCALE: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.Connect
-    ],
-
-    UTILISATION_VOCALE: [
-        PermissionFlagsBits.Connect,
-        PermissionFlagsBits.Speak,
-        PermissionFlagsBits.Stream,
-        PermissionFlagsBits.UseVAD
-    ],
-
-    MODERATION_VOCALE: [
-        PermissionFlagsBits.MuteMembers,
-        PermissionFlagsBits.DeafenMembers,
-        PermissionFlagsBits.MoveMembers
-    ]
-};
-
-const REFUS_ECRITURE_TEXTE = [
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.SendMessagesInThreads,
-    PermissionFlagsBits.CreatePublicThreads,
-    PermissionFlagsBits.CreatePrivateThreads,
-    PermissionFlagsBits.AddReactions
+const TOUS_MILITAIRES = [
+    ...ROLES.OFFICIER,
+    ...ROLES.SOUS_OFFICIER,
+    ...ROLES.MILITAIRE,
+    ...ROLES.SPECIALITES
 ];
 
-const REFUS_ACCES = [
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.ReadMessageHistory,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.Connect
+const HAUT_COMMANDMENT = [
+    ...ROLES.STAFF,
+    ...ROLES.OFFICIER.slice(0, 7)
 ];
 
 // ============================================================================
-// OUTILS
+// UTILITAIRES
 // ============================================================================
 
 function normaliser(texte) {
@@ -232,30 +123,43 @@ function creerConstructeurOverwrites(guild) {
     const overwrites = new Map();
 
     function ajouter(roleId, allow = [], deny = []) {
-        const role = roleId === guild.id
-            ? guild.roles.everyone
-            : guild.roles.cache.get(roleId);
+        // Vérifier que le rôle existe dans le cache
+        if (roleId === guild.id) {
+            const role = guild.roles.everyone;
+            if (!overwrites.has(role.id)) {
+                overwrites.set(role.id, { id: role, allow: new Set(), deny: new Set() });
+            }
+            const overwrite = overwrites.get(role.id);
+            for (const permission of allow) {
+                overwrite.allow.add(permission);
+                overwrite.deny.delete(permission);
+            }
+            for (const permission of deny) {
+                overwrite.deny.add(permission);
+                overwrite.allow.delete(permission);
+            }
+        } else {
+            const role = guild.roles.cache.get(roleId);
+            if (!role) {
+                // Rôle non trouvé dans le cache, on l'ignore
+                return;
+            }
 
-        if (!role) return;
+            if (!overwrites.has(role.id)) {
+                overwrites.set(role.id, { id: role, allow: new Set(), deny: new Set() });
+            }
 
-        if (!overwrites.has(role.id)) {
-            overwrites.set(role.id, {
-                id: role,
-                allow: new Set(),
-                deny: new Set()
-            });
-        }
+            const overwrite = overwrites.get(role.id);
 
-        const overwrite = overwrites.get(role.id);
+            for (const permission of allow) {
+                overwrite.allow.add(permission);
+                overwrite.deny.delete(permission);
+            }
 
-        for (const permission of allow) {
-            overwrite.allow.add(permission);
-            overwrite.deny.delete(permission);
-        }
-
-        for (const permission of deny) {
-            overwrite.deny.add(permission);
-            overwrite.allow.delete(permission);
+            for (const permission of deny) {
+                overwrite.deny.add(permission);
+                overwrite.allow.delete(permission);
+            }
         }
     }
 
@@ -277,31 +181,40 @@ function creerConstructeurOverwrites(guild) {
 }
 
 function staffComplet(builder) {
-    builder.ajouterGroupe(GROUPES.STAFF, [
-        ...PERMISSIONS.LECTURE_TEXTE,
-        ...PERMISSIONS.ECRITURE_TEXTE,
-        ...PERMISSIONS.MODERATION_TEXTE,
-        ...PERMISSIONS.GESTION_SALON,
-        ...PERMISSIONS.LECTURE_VOCALE,
-        ...PERMISSIONS.UTILISATION_VOCALE,
-        ...PERMISSIONS.MODERATION_VOCALE
+    builder.ajouterGroupe(ROLES.STAFF, [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageMessages,
+        PermissionFlagsBits.ManageThreads,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.MuteMembers,
+        PermissionFlagsBits.DeafenMembers,
+        PermissionFlagsBits.MoveMembers
     ]);
 }
 
 function militairesLectureEcriture(builder) {
-    builder.ajouterGroupe(GROUPES.MILITAIRES, [
-        ...PERMISSIONS.LECTURE_TEXTE,
-        ...PERMISSIONS.ECRITURE_TEXTE,
-        ...PERMISSIONS.LECTURE_VOCALE,
-        ...PERMISSIONS.UTILISATION_VOCALE
+    builder.ajouterGroupe(TOUS_MILITAIRES, [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak
     ]);
 }
 
 function militairesLecture(builder) {
-    builder.ajouterGroupe(GROUPES.MILITAIRES, [
-        ...PERMISSIONS.LECTURE_TEXTE,
-        ...PERMISSIONS.LECTURE_VOCALE
-    ], REFUS_ECRITURE_TEXTE);
+    builder.ajouterGroupe(TOUS_MILITAIRES, [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.Connect
+    ], [
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.Speak
+    ]);
 }
 
 // ============================================================================
@@ -311,7 +224,12 @@ function militairesLecture(builder) {
 function modeleStaffUniquement(guild) {
     const builder = creerConstructeurOverwrites(guild);
 
-    builder.ajouter(guild.id, [], REFUS_ACCES);
+    builder.ajouter(guild.id, [], [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.Connect
+    ]);
     staffComplet(builder);
 
     return builder.construire();
@@ -320,7 +238,16 @@ function modeleStaffUniquement(guild) {
 function modeleInformationRP(guild) {
     const builder = creerConstructeurOverwrites(guild);
 
-    builder.ajouter(guild.id, PERMISSIONS.LECTURE_TEXTE, REFUS_ECRITURE_TEXTE);
+    builder.ajouter(guild.id, [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory
+    ], [
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.SendMessagesInThreads,
+        PermissionFlagsBits.CreatePublicThreads,
+        PermissionFlagsBits.CreatePrivateThreads,
+        PermissionFlagsBits.AddReactions
+    ]);
     staffComplet(builder);
 
     return builder.construire();
@@ -338,24 +265,33 @@ function modeleAideRecrues(salon, guild) {
 
     const builder = creerConstructeurOverwrites(guild);
 
-    builder.ajouter(guild.id, [], REFUS_ACCES);
+    builder.ajouter(guild.id, [], [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.Connect
+    ]);
     staffComplet(builder);
 
     builder.ajouterGroupe(ROLES.CIRFA, [
-        ...PERMISSIONS.LECTURE_TEXTE,
-        ...PERMISSIONS.ECRITURE_TEXTE,
-        ...PERMISSIONS.MODERATION_TEXTE,
-        ...PERMISSIONS.LECTURE_VOCALE,
-        ...PERMISSIONS.UTILISATION_VOCALE,
-        ...PERMISSIONS.MODERATION_VOCALE
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageMessages,
+        PermissionFlagsBits.ManageThreads,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.MuteMembers
     ]);
 
     if (accessibleNouveaux) {
         builder.ajouter(ROLES.NOUVEAUX_ARRIVANTS, [
-            ...PERMISSIONS.LECTURE_TEXTE,
-            ...PERMISSIONS.ECRITURE_TEXTE,
-            ...PERMISSIONS.LECTURE_VOCALE,
-            ...PERMISSIONS.UTILISATION_VOCALE
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak
         ]);
     }
 
@@ -374,11 +310,22 @@ function modeleCommunicationGenerale(salon, guild) {
     const builder = creerConstructeurOverwrites(guild);
 
     if (lectureSeule) {
-        builder.ajouter(guild.id, PERMISSIONS.LECTURE_TEXTE, REFUS_ECRITURE_TEXTE);
+        builder.ajouter(guild.id, [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.ReadMessageHistory
+        ], [
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.SendMessagesInThreads,
+            PermissionFlagsBits.CreatePublicThreads,
+            PermissionFlagsBits.CreatePrivateThreads,
+            PermissionFlagsBits.AddReactions
+        ]);
     } else {
         builder.ajouter(guild.id, [
-            ...PERMISSIONS.LECTURE_TEXTE,
-            ...PERMISSIONS.ECRITURE_TEXTE
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.UseApplicationCommands
         ]);
     }
 
@@ -391,7 +338,12 @@ function modeleOperationsMilitaires(salon, guild) {
     const nom = nomSalon(salon);
     const builder = creerConstructeurOverwrites(guild);
 
-    builder.ajouter(guild.id, [], REFUS_ACCES);
+    builder.ajouter(guild.id, [], [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.Connect
+    ]);
     staffComplet(builder);
 
     if (contient(nom, ['protocole'])) {
@@ -406,16 +358,22 @@ function modeleOperationsMilitaires(salon, guild) {
 function modeleEtatMajor(guild) {
     const builder = creerConstructeurOverwrites(guild);
 
-    builder.ajouter(guild.id, [], REFUS_ACCES);
+    builder.ajouter(guild.id, [], [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.Connect
+    ]);
     staffComplet(builder);
 
-    builder.ajouterGroupe(GROUPES.HAUT_COMMANDEMENT, [
-        ...PERMISSIONS.LECTURE_TEXTE,
-        ...PERMISSIONS.ECRITURE_TEXTE,
-        ...PERMISSIONS.MODERATION_TEXTE,
-        ...PERMISSIONS.LECTURE_VOCALE,
-        ...PERMISSIONS.UTILISATION_VOCALE,
-        ...PERMISSIONS.MODERATION_VOCALE
+    builder.ajouterGroupe(HAUT_COMMANDMENT, [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageMessages,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.MuteMembers
     ]);
 
     return builder.construire();
@@ -425,28 +383,36 @@ function modeleUniteSpeciale(salon, guild) {
     const nom = nomSalon(salon);
     const builder = creerConstructeurOverwrites(guild);
 
-    builder.ajouter(guild.id, [], REFUS_ACCES);
+    builder.ajouter(guild.id, [], [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.Connect
+    ]);
     staffComplet(builder);
 
     let rolesAutorises = [];
 
     if (contient(nom, ['pilote', 'aerien'])) {
-        rolesAutorises = ROLES.PILOTES;
+        rolesAutorises = ROLES.SPECIALITES.filter(id => 
+            id === ROLES.SPECIALITES[0] || id === ROLES.SPECIALITES[1]
+        );
     } else if (contient(nom, ['forces speciales', 'forces spec'])) {
-        rolesAutorises = ROLES.FORCES_SPECIALES;
+        rolesAutorises = [ROLES.SPECIALITES[3]];
     } else if (contient(nom, ['medical', 'medecin'])) {
-        rolesAutorises = ROLES.MEDECINS;
+        rolesAutorises = [ROLES.SPECIALITES[4]];
     } else if (contient(nom, ['sniper'])) {
-        rolesAutorises = ROLES.SNIPERS;
+        rolesAutorises = [ROLES.SPECIALITES[5]];
     } else if (contient(nom, ['operateurs mission', 'operateur mission'])) {
-        rolesAutorises = ROLES.OPERATEURS_MISSION;
+        rolesAutorises = [ROLES.SPECIALITES[2]];
     }
 
     builder.ajouterGroupe(rolesAutorises, [
-        ...PERMISSIONS.LECTURE_TEXTE,
-        ...PERMISSIONS.ECRITURE_TEXTE,
-        ...PERMISSIONS.LECTURE_VOCALE,
-        ...PERMISSIONS.UTILISATION_VOCALE
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak
     ]);
 
     return builder.construire();
@@ -456,12 +422,22 @@ function modeleFormationEtEntrainement(salon, guild) {
     const nom = nomSalon(salon);
     const builder = creerConstructeurOverwrites(guild);
 
-    builder.ajouter(guild.id, [], REFUS_ACCES);
+    builder.ajouter(guild.id, [], [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.Connect
+    ]);
     staffComplet(builder);
     militairesLectureEcriture(builder);
 
     if (contient(nom, ['academie militaire', 'guides tactiques', 'entrainement brm5'])) {
-        builder.ajouter(ROLES.NOUVEAUX_ARRIVANTS, PERMISSIONS.LECTURE_TEXTE, REFUS_ECRITURE_TEXTE);
+        builder.ajouter(ROLES.NOUVEAUX_ARRIVANTS, [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.ReadMessageHistory
+        ], [
+            PermissionFlagsBits.SendMessages
+        ]);
     }
 
     return builder.construire();
@@ -472,65 +448,90 @@ function modeleVocal(salon, guild) {
     const builder = creerConstructeurOverwrites(guild);
 
     if (contient(nom, ['administration'])) {
-        builder.ajouter(guild.id, [], REFUS_ACCES);
+        builder.ajouter(guild.id, [], [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect
+        ]);
         staffComplet(builder);
         return builder.construire();
     }
 
     if (contient(nom, ['etat major'])) {
-        builder.ajouter(guild.id, [], REFUS_ACCES);
+        builder.ajouter(guild.id, [], [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect
+        ]);
         staffComplet(builder);
-        builder.ajouterGroupe(GROUPES.HAUT_COMMANDEMENT, [
-            ...PERMISSIONS.LECTURE_VOCALE,
-            ...PERMISSIONS.UTILISATION_VOCALE,
-            ...PERMISSIONS.MODERATION_VOCALE
+        builder.ajouterGroupe(HAUT_COMMANDMENT, [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak,
+            PermissionFlagsBits.MuteMembers,
+            PermissionFlagsBits.DeafenMembers
         ]);
         return builder.construire();
     }
 
     if (contient(nom, ['commandement'])) {
-        builder.ajouter(guild.id, [], REFUS_ACCES);
+        builder.ajouter(guild.id, [], [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect
+        ]);
         staffComplet(builder);
-        builder.ajouterGroupe(GROUPES.OFFICIERS, [
-            ...PERMISSIONS.LECTURE_VOCALE,
-            ...PERMISSIONS.UTILISATION_VOCALE
+        builder.ajouterGroupe(ROLES.OFFICIER, [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak
         ]);
         return builder.construire();
     }
 
     if (contient(nom, ['pilotes'])) {
-        builder.ajouter(guild.id, [], REFUS_ACCES);
+        builder.ajouter(guild.id, [], [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect
+        ]);
         staffComplet(builder);
-        builder.ajouterGroupe(ROLES.PILOTES, [
-            ...PERMISSIONS.LECTURE_VOCALE,
-            ...PERMISSIONS.UTILISATION_VOCALE
+        builder.ajouterGroupe([ROLES.SPECIALITES[0], ROLES.SPECIALITES[1]], [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak
         ]);
         return builder.construire();
     }
 
     if (contient(nom, ['forces spec'])) {
-        builder.ajouter(guild.id, [], REFUS_ACCES);
+        builder.ajouter(guild.id, [], [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect
+        ]);
         staffComplet(builder);
-        builder.ajouterGroupe(ROLES.FORCES_SPECIALES, [
-            ...PERMISSIONS.LECTURE_VOCALE,
-            ...PERMISSIONS.UTILISATION_VOCALE
+        builder.ajouterGroupe([ROLES.SPECIALITES[3]], [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak
         ]);
         return builder.construire();
     }
 
     if (contient(nom, ['operations'])) {
-        builder.ajouter(guild.id, [], REFUS_ACCES);
+        builder.ajouter(guild.id, [], [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect
+        ]);
         staffComplet(builder);
-        builder.ajouterGroupe(GROUPES.MILITAIRES, [
-            ...PERMISSIONS.LECTURE_VOCALE,
-            ...PERMISSIONS.UTILISATION_VOCALE
+        builder.ajouterGroupe(TOUS_MILITAIRES, [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak
         ]);
         return builder.construire();
     }
 
     builder.ajouter(guild.id, [
-        ...PERMISSIONS.LECTURE_VOCALE,
-        ...PERMISSIONS.UTILISATION_VOCALE
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak
     ]);
 
     staffComplet(builder);
@@ -636,7 +637,7 @@ function detecterModele(salon, guild) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('fixperms')
-        .setDescription('Réinitialise les permissions des salons selon le protocole (Admin uniquement)')
+        .setDescription('Réinitialise les permissions des salons (Admin uniquement)')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .setDMPermission(false),
 
@@ -660,6 +661,7 @@ module.exports = {
             });
         }
 
+        // Forcer le chargement de tous les rôles et salons
         await guild.roles.fetch();
         await guild.channels.fetch();
 
@@ -670,6 +672,7 @@ module.exports = {
         let reussis = 0;
         let ignores = 0;
 
+        // Filtrer pour exclure les threads (fils de discussion)
         const salons = guild.channels.cache
             .filter((salon) => !estFil(salon))
             .sort((a, b) => {
@@ -679,6 +682,7 @@ module.exports = {
             });
 
         for (const salon of salons.values()) {
+            // Vérifier que le salon a des permissionOverwrites
             if (!salon.permissionOverwrites?.set) {
                 ignores++;
                 rapport.push(`[IGNORÉ] ${salon.id} — Ce type de salon ne possède pas de permissions modifiables.`);
@@ -762,6 +766,7 @@ module.exports = {
         lignesFinales.push(`Rapport généré le ${new Date().toISOString()}`);
         lignesFinales.push('================================================================');
 
+        const { AttachmentBuilder } = require('discord.js');
         const fichier = new AttachmentBuilder(
             Buffer.from(lignesFinales.join('\n'), 'utf8'),
             { name: `rapport-permissions-${guild.id}.txt` }
