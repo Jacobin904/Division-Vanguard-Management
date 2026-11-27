@@ -3,60 +3,57 @@
 const {
     SlashCommandBuilder,
     PermissionFlagsBits,
-    ChannelType
+    ChannelType,
+    AttachmentBuilder
 } = require('discord.js');
-
-// ============================================================================
-// CONFIGURATION DES RÔLES
-// ============================================================================
 
 const ROLES = {
     STAFF: [
-        '1502329914224017710', // Fondation
-        '1502321921113460827', // Admin Interne
-        '1502321894462980257', // Manager de Communauté
-        '1502321920652345484'  // Directeur
+        '1502329914224017710',
+        '1502321921113460827',
+        '1502321894462980257',
+        '1502321920652345484'
     ],
     OFFICIER: [
-        '1502321913169707089', // Général Armée
-        '1502321912314073251', // Général de Corps Armée
-        '1502321911433138387', // Général de Division
-        '1502321910665580745', // Général de Brigade
-        '1502321909596033156', // Colonel
-        '1502321908966887424', // Lieutenant-Colonel
-        '1502321908182552647', // Commandant
-        '1502321907431637132', // Capitaine
-        '1502321906353701025', // Lieutenant
-        '1569021434125357056', // Sous-lieutenant
-        '1502321905212985475'  // Aspirant
+        '1502321913169707089',
+        '1502321912314073251',
+        '1502321911433138387',
+        '1502321910665580745',
+        '1502321909596033156',
+        '1502321908966887424',
+        '1502321908182552647',
+        '1502321907431637132',
+        '1502321906353701025',
+        '1569021434125357056',
+        '1502321905212985475'
     ],
     SOUS_OFFICIER: [
-        '1502321904026124438', // Major
-        '1502321903333806225', // Adjudant-Chef
-        '1502321902020984842', // Adjudant
-        '1502321900779737200', // Sergent-Chef
-        '1502321899751866550'  // Sergent
+        '1502321904026124438',
+        '1502321903333806225',
+        '1502321902020984842',
+        '1502321900779737200',
+        '1502321899751866550'
     ],
     MILITAIRE: [
-        '1569022303034146886', // Caporal-chef de 1re classe
-        '1502321898350972980', // Caporal-chef
-        '1502321897147203654', // Caporal
-        '1569022882288378017', // Soldat de 1re classe
-        '1502321896212009001', // Soldat
-        '1502472415127666780'  // Engagé Volontaire Initial
+        '1569022303034146886',
+        '1502321898350972980',
+        '1502321897147203654',
+        '1569022882288378017',
+        '1502321896212009001',
+        '1502472415127666780'
     ],
     SPECIALITES: [
-        '1502321914516078652', // Pilote
-        '1502321915962986516', // Pilote Chef
-        '1502321916692926695', // Opérateur Mission
-        '1502321917535715328', // Forces Spéciales
-        '1502321918387425450', // Médecin
-        '1502321919662493758'  // Sniper Élite
+        '1502321914516078652',
+        '1502321915962986516',
+        '1502321916692926695',
+        '1502321917535715328',
+        '1502321918387425450',
+        '1502321919662493758'
     ],
     CIRFA: [
-        '1503124531391365203', // CIRFA
-        '1507547514264485969', // CIRFA spécialité
-        '1504628622969798787'  // Centre d'Information et de Recrutement
+        '1503124531391365203',
+        '1507547514264485969',
+        '1504628622969798787'
     ],
     NOUVEAUX_ARRIVANTS: '1503483501113249792',
     BOT: '1503484181735276605'
@@ -73,10 +70,6 @@ const HAUT_COMMANDMENT = [
     ...ROLES.STAFF,
     ...ROLES.OFFICIER.slice(0, 7)
 ];
-
-// ============================================================================
-// UTILITAIRES
-// ============================================================================
 
 function normaliser(texte) {
     return String(texte || '')
@@ -123,7 +116,6 @@ function creerConstructeurOverwrites(guild) {
     const overwrites = new Map();
 
     function ajouter(roleId, allow = [], deny = []) {
-        // Vérifier que le rôle existe dans le cache
         if (roleId === guild.id) {
             const role = guild.roles.everyone;
             if (!overwrites.has(role.id)) {
@@ -141,7 +133,6 @@ function creerConstructeurOverwrites(guild) {
         } else {
             const role = guild.roles.cache.get(roleId);
             if (!role) {
-                // Rôle non trouvé dans le cache, on l'ignore
                 return;
             }
 
@@ -216,10 +207,6 @@ function militairesLecture(builder) {
         PermissionFlagsBits.Speak
     ]);
 }
-
-// ============================================================================
-// MODÈLES PAR SECTION
-// ============================================================================
 
 function modeleStaffUniquement(guild) {
     const builder = creerConstructeurOverwrites(guild);
@@ -539,10 +526,6 @@ function modeleVocal(salon, guild) {
     return builder.construire();
 }
 
-// ============================================================================
-// DÉTECTION DU MODÈLE
-// ============================================================================
-
 function detecterModele(salon, guild) {
     const categorie = nomCategorie(salon, guild);
     const nom = nomSalon(salon);
@@ -630,10 +613,6 @@ function detecterModele(salon, guild) {
     };
 }
 
-// ============================================================================
-// COMMANDE
-// ============================================================================
-
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('fixperms')
@@ -661,7 +640,6 @@ module.exports = {
             });
         }
 
-        // Forcer le chargement de tous les rôles et salons
         await guild.roles.fetch();
         await guild.channels.fetch();
 
@@ -672,7 +650,6 @@ module.exports = {
         let reussis = 0;
         let ignores = 0;
 
-        // Filtrer pour exclure les threads (fils de discussion)
         const salons = guild.channels.cache
             .filter((salon) => !estFil(salon))
             .sort((a, b) => {
@@ -682,10 +659,9 @@ module.exports = {
             });
 
         for (const salon of salons.values()) {
-            // Vérifier que le salon a des permissionOverwrites
-            if (!salon.permissionOverwrites?.set) {
+            if (!salon.permissionOverwrites || typeof salon.permissionOverwrites.set !== 'function') {
                 ignores++;
-                rapport.push(`[IGNORÉ] ${salon.id} — Ce type de salon ne possède pas de permissions modifiables.`);
+                rapport.push(`[IGNORÉ] ${salon.name || salon.id} — Ce type de salon ne supporte pas les permissions.`);
                 continue;
             }
 
@@ -766,7 +742,6 @@ module.exports = {
         lignesFinales.push(`Rapport généré le ${new Date().toISOString()}`);
         lignesFinales.push('================================================================');
 
-        const { AttachmentBuilder } = require('discord.js');
         const fichier = new AttachmentBuilder(
             Buffer.from(lignesFinales.join('\n'), 'utf8'),
             { name: `rapport-permissions-${guild.id}.txt` }
