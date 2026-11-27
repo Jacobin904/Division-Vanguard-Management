@@ -1,7 +1,7 @@
 {
   "name": "division-vanguard-management",
   "version": "1.0.0",
-  "description": "Bot de gestion Division Vanguard",
+  "description": "Bot et portail web de gestion pour Division Vanguard",
   "main": "server.js",
   "scripts": {
     "start": "node deploy-commands.js && node server.js",
