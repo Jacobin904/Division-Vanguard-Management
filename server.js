@@ -118,10 +118,7 @@ app.post('/verify', async (req, res) => {
             headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN || process.env.TOKEN}` }
         });
 
-        if (!userResponse.ok) {
-            return res.status(500).send('Erreur interne.');
-        }
-
+        if (!userResponse.ok) return res.status(500).send('Erreur interne.');
         const user = await userResponse.json();
 
         req.session.authenticated = true;
@@ -160,11 +157,7 @@ app.get('/dashboard', async (req, res) => {
         boostCount: guild.premiumSubscriptionCount || 0
     } : null;
 
-    res.render('dashboard', { 
-        user: req.session.user, 
-        roles: userRoles, 
-        guild: guildInfo 
-    });
+    res.render('dashboard', { user: req.session.user, roles: userRoles, guild: guildInfo });
 });
 
 app.get('/logout', (req, res) => {
